@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Whisper Hélio — Dictée vocale gratuite & offline</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080d14;
+      --bg2: #0d1520;
+      --card: #111c2d;
+      --card2: #0f1928;
+      --green: #2ecc71;
+      --green2: #27ae60;
+      --purple: #7c3aed;
+      --purple2: #5b21b6;
+      --blue: #3498db;
+      --orange: #f39c12;
+      --red: #e74c3c;
+      --text: #e8f0fe;
+      --text2: #8899bb;
+      --border: rgba(124,58,237,0.2);
+      --glow: rgba(46,204,113,0.15);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── BRUIT DE FOND ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 16px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(8,13,20,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Space Mono', monospace;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-logo .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text2);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--green); }
+
+    .nav-cta {
+      background: var(--green);
+      color: #000 !important;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-weight: 700 !important;
+    }
+
+    .nav-cta:hover { background: var(--green2) !important; color: #000 !important; }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 40px 80px;
+      overflow: hidden;
+    }
+
+    .hero-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+
+    .orb1 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, rgba(46,204,113,0.12), transparent 70%);
+      top: -100px; left: -100px;
+      animation: float1 8s ease-in-out infinite;
+    }
+
+    .orb2 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(124,58,237,0.1), transparent 70%);
+      bottom: -150px; right: -150px;
+      animation: float2 10s ease-in-out infinite;
+    }
+
+    .orb3 {
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(52,152,219,0.08), transparent 70%);
+      top: 40%; left: 60%;
+      animation: float3 7s ease-in-out infinite;
+    }
+
+    @keyframes float1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,20px)} }
+    @keyframes float2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-20px,30px)} }
+    @keyframes float3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(15px,-25px)} }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(46,204,113,0.1);
+      border: 1px solid rgba(46,204,113,0.3);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--green);
+      margin-bottom: 32px;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .hero-title {
+      font-size: clamp(3rem, 8vw, 6rem);
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 16px;
+      animation: fadeDown 0.6s 0.1s ease both;
+    }
+
+    .hero-title .accent { color: var(--green); }
+    .hero-title .version {
+      font-size: 0.4em;
+      color: var(--purple);
+      vertical-align: super;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--text2);
+      max-width: 580px;
+      line-height: 1.7;
+      margin-bottom: 48px;
+      animation: fadeDown 0.6s 0.2s ease both;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeDown 0.6s 0.3s ease both;
+      margin-bottom: 80px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--green);
+      color: #000;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 0 30px rgba(46,204,113,0.3);
+    }
+
+    .btn-primary:hover {
+      background: var(--green2);
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(46,204,113,0.5);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      color: var(--text);
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1rem;
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--purple);
+      color: var(--purple);
+      transform: translateY(-2px);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 48px;
+      justify-content: center;
+      animation: fadeDown 0.6s 0.4s ease both;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--green);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── VU METRE ANIMÉ ── */
+    .vu-demo {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto 60px;
+      animation: fadeDown 0.6s 0.35s ease both;
+    }
+
+    .vu-bar-container {
+      background: #0a0f1a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .vu-label { color: var(--green); white-space: nowrap; }
+
+    .vu-bars {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex: 1;
+      height: 32px;
+    }
+
+    .vu-bar {
+      flex: 1;
+      border-radius: 2px;
+      animation: vuAnim var(--d, 0.8s) ease-in-out infinite alternate;
+      background: var(--green);
+    }
+
+    @keyframes vuAnim {
+      from { height: 4px; opacity: 0.4; }
+      to { height: var(--h, 20px); opacity: 1; }
+    }
+
+    .vu-status { color: var(--text2); white-space: nowrap; font-size: 0.7rem; }
+
+    /* ── SECTION SCREENSHOTS ── */
+    .section {
+      padding: 100px 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--purple);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      margin-bottom: 16px;
+      line-height: 1.1;
+    }
+
+    .section-sub {
+      color: var(--text2);
+      font-size: 1.05rem;
+      max-width: 500px;
+      line-height: 1.7;
+      margin-bottom: 60px;
+    }
+
+    /* Screenshots */
+    .screenshots-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .screenshot-card {
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .screenshot-card:hover {
+      border-color: var(--purple);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(124,58,237,0.2);
+    }
+
+    .screenshot-card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .screenshot-card .caption {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(8,13,20,0.95));
+      padding: 32px 20px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text2);
+    }
+
+    .screenshot-card.large {
+      grid-column: span 2;
+    }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent, var(--green)), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .feature-card:hover::before { opacity: 1; }
+    .feature-card:hover {
+      border-color: rgba(124,58,237,0.4);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 16px;
+    }
+
+    .feature-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .feature-desc {
+      color: var(--text2);
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    /* ── INSTALL STEPS ── */
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .step {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .step:hover {
+      border-color: var(--green);
+      box-shadow: 0 0 30px rgba(46,204,113,0.1);
+    }
+
+    .step-num {
+      font-family: 'Space Mono', monospace;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: rgba(46,204,113,0.15);
+      position: absolute;
+      top: 16px; right: 20px;
+      line-height: 1;
+    }
+
+    .step-icon { font-size: 1.8rem; margin-bottom: 16px; }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .step-desc {
+      color: var(--text2);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .step-code {
+      font-family: 'Space Mono', monospace;
+      background: rgba(46,204,113,0.08);
+      border: 1px solid rgba(46,204,113,0.2);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      color: var(--green);
+      display: inline-block;
+      margin-top: 8px;
+    }
+
+    /* ── MODELS TABLE ── */
+    .models-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .models-table th {
+      text-align: left;
+      padding: 12px 16px;
+      background: rgba(124,58,237,0.1);
+      color: var(--purple);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .models-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+    }
+
+    .models-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--text); }
+
+    .models-table .recommended {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-green { background: rgba(46,204,113,0.15); color: var(--green); }
+    .badge-orange { background: rgba(243,156,18,0.15); color: var(--orange); }
+    .badge-red { background: rgba(231,76,60,0.15); color: var(--red); }
+
+    /* ── ABOUT ── */
+    .about-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 48px;
+      align-items: center;
+    }
+
+    .about-avatar {
+      text-align: center;
+    }
+
+    .avatar-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--blue));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      margin: 0 auto 16px;
+      border: 3px solid var(--border);
+    }
+
+    .about-name {
+      font-weight: 700;
+      font-size: 1.1rem;
+      margin-bottom: 4px;
+    }
+
+    .about-location {
+      color: var(--text2);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .about-text {
+      color: var(--text2);
+      line-height: 1.8;
+      font-size: 0.95rem;
+    }
+
+    .about-text p { margin-bottom: 16px; }
+    .about-text p:last-child { margin-bottom: 0; }
+
+    .about-text strong { color: var(--text); }
+
+    .about-highlight {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(46,204,113,0.08);
+      border: 1px solid rgba(46,204,113,0.2);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      color: var(--green);
+      margin-top: 8px;
+    }
+
+    /* ── SUPPORT ── */
+    .support-card {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(46,204,113,0.1));
+      border: 1px solid rgba(124,58,237,0.3);
+      border-radius: 20px;
+      padding: 60px 48px;
+      text-align: center;
+    }
+
+    .support-card h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+
+    .support-card p {
+      color: var(--text2);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      max-width: 560px;
+      margin: 0 auto 32px;
+    }
+
+    .btn-paypal {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #0070ba;
+      color: white;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: all 0.2s;
+      box-shadow: 0 0 30px rgba(0,112,186,0.3);
+    }
+
+    .btn-paypal:hover {
+      background: #005ea6;
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(0,112,186,0.5);
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px;
+      text-align: center;
+      color: var(--text2);
+      font-size: 0.85rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    footer a { color: var(--green); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 0 40px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      nav { padding: 12px 20px; }
+      .nav-links { display: none; }
+      .hero { padding: 100px 20px 60px; }
+      .hero-stats { gap: 24px; }
+      .section { padding: 60px 20px; }
+      .screenshots-grid { grid-template-columns: 1fr; }
+      .screenshot-card.large { grid-column: span 1; }
+      .about-card { grid-template-columns: 1fr; text-align: center; gap: 24px; }
+      .about-location { justify-content: center; }
+      .support-card { padding: 40px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="dot"></div>
+    Whisper Hélio
+  </div>
+  <ul class="nav-links">
+    <li><a href="#features">Fonctionnalités</a></li>
+    <li><a href="#screenshots">Aperçu</a></li>
+    <li><a href="#install">Installation</a></li>
+    <li><a href="#about">À propos</a></li>
+    <li><a href="https://github.com/helioman32/whisper-helio/releases" class="nav-cta">⬇ Télécharger</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-orb orb3"></div>
+
+  <div class="hero-badge">
+    <span>🎙</span> v1.2 — Stable — 100% gratuit
+  </div>
+
+  <h1 class="hero-title">
+    Whisper <span class="accent">Hélio</span><span class="version">v1.2</span>
+  </h1>
+
+  <p class="hero-sub">
+    Dictée vocale <strong>gratuite</strong>, autonome et <strong>100% hors ligne</strong> pour Windows.
+    Appuyez sur F9, parlez, relâchez — votre texte apparaît instantanément, partout.
+  </p>
+
+  <!-- VU mètre animé -->
+  <div class="vu-demo">
+    <div class="vu-bar-container">
+      <span class="vu-label">🟢 Prêt — F9 pour dicter</span>
+      <div class="vu-bars" id="vuBars"></div>
+      <span class="vu-status">GPU: NVIDIA RTX</span>
+    </div>
+  </div>
+
+  <div class="hero-buttons">
+    <a href="https://github.com/helioman32/whisper-helio/releases" class="btn-primary">
+      ⬇ Télécharger gratuitement
+    </a>
+    <a href="https://github.com/helioman32/whisper-helio" class="btn-secondary">
+      ★ Voir sur GitHub
+    </a>
+  </div>
+
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">Hors ligne</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">0€</div>
+      <div class="stat-label">Gratuit</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">7+</div>
+      <div class="stat-label">Langues</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">5Go</div>
+      <div class="stat-label">Tout inclus</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SCREENSHOTS -->
+<section class="section" id="screenshots">
+  <div class="section-label">// Aperçu</div>
+  <h2 class="section-title">Voir c'est croire</h2>
+  <p class="section-sub">Une interface épurée qui ne vole jamais le focus. Votre zone de texte reste toujours active.</p>
+
+  <div class="screenshots-grid">
+    <div class="screenshot-card large">
+      <img src="screenshot3.png" alt="Whisper Hélio — Dictée dans Word en temps réel">
+      <div class="caption">🎤 Dictée en action — le texte apparaît directement dans Word</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="screenshot1.png" alt="Whisper Hélio — Transcription en cours">
+      <div class="caption">🟢 "Bonjour les amis, vous allez bien ?" — transcrit instantanément</div>
+    </div>
+    <div class="screenshot-card">
+      <img src="screenshot2.png" alt="Whisper Hélio — Fenêtre paramètres">
+      <div class="caption">⚙ Paramètres — modèle, langue, raccourci, thème...</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">// Fonctionnalités</div>
+  <h2 class="section-title">Tout ce qu'il vous faut</h2>
+  <p class="section-sub">Conçu pour la productivité quotidienne, pas pour impressionner une démo.</p>
+
+  <div class="features-grid">
+    <div class="feature-card" style="--accent: #2ecc71">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">Confidentialité totale</div>
+      <div class="feature-desc">Aucun son envoyé sur internet. Tout est traité localement sur votre ordinateur. Vos données vous appartiennent.</div>
+    </div>
+    <div class="feature-card" style="--accent: #3498db">
+      <div class="feature-icon">📦</div>
+      <div class="feature-title">Zéro installation</div>
+      <div class="feature-desc">Version .exe autonome. Pas besoin d'installer Python ou quoi que ce soit. Décompressez et c'est prêt.</div>
+    </div>
+    <div class="feature-card" style="--accent: #e74c3c">
+      <div class="feature-icon">🎤</div>
+      <div class="feature-title">Dictée Push-to-Talk</div>
+      <div class="feature-desc">Maintenez F9 (ou un bouton souris), parlez, relâchez. Le texte se colle automatiquement dans n'importe quelle application.</div>
+    </div>
+    <div class="feature-card" style="--accent: #f39c12">
+      <div class="feature-icon">🔴</div>
+      <div class="feature-title">Mode Réunion</div>
+      <div class="feature-desc">Enregistrement continu avec transcription automatique toutes les 5 secondes. Idéal pour les réunions et conférences.</div>
+    </div>
+    <div class="feature-card" style="--accent: #7c3aed">
+      <div class="feature-icon">⚡</div>
+      <div class="feature-title">Optimisation GPU</div>
+      <div class="feature-desc">Utilise votre carte NVIDIA (CUDA) pour une transcription ultra-rapide. Détection automatique du matériel.</div>
+    </div>
+    <div class="feature-card" style="--accent: #2ecc71">
+      <div class="feature-icon">🌍</div>
+      <div class="feature-title">Multi-langues</div>
+      <div class="feature-desc">Interface en français, anglais et allemand. Dictée en FR, EN, DE, ES, IT, PT, NL et plus encore.</div>
+    </div>
+    <div class="feature-card" style="--accent: #3498db">
+      <div class="feature-icon">🖱️</div>
+      <div class="feature-title">Boutons souris</div>
+      <div class="feature-desc">Compatible avec les boutons pouce avant/arrière de votre souris. Configurez votre raccourci préféré.</div>
+    </div>
+    <div class="feature-card" style="--accent: #2ecc71">
+      <div class="feature-icon">🪟</div>
+      <div class="feature-title">Focus préservé</div>
+      <div class="feature-desc">La fenêtre ne vole jamais le focus. Votre zone de texte reste active même quand vous cliquez sur les boutons.</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- INSTALL -->
+<section class="section" id="install">
+  <div class="section-label">// Installation</div>
+  <h2 class="section-title">Prêt en 4 étapes</h2>
+  <p class="section-sub">Aucune compétence technique requise. Si vous pouvez décompresser un fichier ZIP, vous pouvez utiliser Whisper Hélio.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-icon">⬇</div>
+      <div class="step-title">Télécharger</div>
+      <div class="step-desc">Téléchargez l'archive ZIP depuis GitHub Releases.</div>
+      <div class="step-code">Whisper_Helio_v1.2.zip</div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-icon">📂</div>
+      <div class="step-title">Extraire</div>
+      <div class="step-desc">Extrayez tout le contenu dans un dossier. Ne supprimez pas le dossier _internal !</div>
+      <div class="step-code">C:\Whisper Helio\</div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-icon">▶</div>
+      <div class="step-title">Installer</div>
+      <div class="step-desc">Double-cliquez sur installer.bat. Les raccourcis sont créés automatiquement.</div>
+      <div class="step-code">installer.bat</div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-icon">🎤</div>
+      <div class="step-title">Dicter !</div>
+      <div class="step-desc">Attendez le voyant vert, placez votre curseur, et maintenez F9 pour parler.</div>
+      <div class="step-code">F9 → parler → relâcher</div>
+    </div>
+  </div>
+
+  <div style="margin-top:40px; padding:20px 24px; background:rgba(243,156,18,0.08); border:1px solid rgba(243,156,18,0.2); border-radius:12px; color:var(--orange); font-size:0.9rem;">
+    ⚠️ <strong>Premier lancement :</strong> Le modèle Whisper sera téléchargé automatiquement (~3 Go). Une connexion internet est requise uniquement pour ce premier téléchargement.
+  </div>
+
+  <!-- Tableau modèles -->
+  <div style="margin-top:60px;">
+    <h3 style="font-size:1.3rem; margin-bottom:24px; font-weight:700;">Choisir son modèle Whisper</h3>
+    <div style="border:1px solid var(--border); border-radius:12px; overflow:hidden;">
+      <table class="models-table">
+        <thead>
+          <tr>
+            <th>Modèle</th>
+            <th>Taille</th>
+            <th>Vitesse</th>
+            <th>Précision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>tiny</td><td>75 Mo</td><td><span class="badge badge-green">Très rapide</span></td><td>Basique</td></tr>
+          <tr><td>base</td><td>140 Mo</td><td><span class="badge badge-green">Rapide</span></td><td>Correcte</td></tr>
+          <tr><td>small</td><td>480 Mo</td><td><span class="badge badge-orange">Moyen</span></td><td>Bonne</td></tr>
+          <tr><td>medium</td><td>1,5 Go</td><td><span class="badge badge-orange">Moyen</span></td><td>Très bonne</td></tr>
+          <tr><td class="recommended">large-v3 ★</td><td>3 Go</td><td><span class="badge badge-red">Lent (CPU) / Rapide (GPU)</span></td><td class="recommended">Excellente</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ABOUT -->
+<section class="section" id="about">
+  <div class="section-label">// À propos</div>
+  <h2 class="section-title">L'auteur</h2>
+
+  <div class="about-card">
+    <div class="about-avatar">
+      <div class="avatar-circle">🎙</div>
+      <div class="about-name">Hélio</div>
+      <div class="about-location">📍 Bretagne, France</div>
+      <div style="margin-top:16px;">
+        <div class="about-highlight">🍁 Canada 2028</div>
+      </div>
+    </div>
+    <div class="about-text">
+      <p>Je m'appelle <strong>Hélio</strong>, je suis basé en <strong>Bretagne</strong> (France). J'ai créé Whisper Hélio parce que j'avais besoin d'un outil de dictée vocale simple, rapide et qui respecte ma vie privée — sans abonnement, sans cloud, sans compromis.</p>
+      <p>En <strong>2028</strong>, je prévois de m'installer au <strong>Canada</strong> pour rejoindre ma compagne, chercheuse. Ce projet m'accompagne dans cette aventure !</p>
+      <p>Si vous avez des <strong>idées d'amélioration</strong>, des suggestions de fonctionnalités ou simplement envie d'échanger — n'hésitez pas à ouvrir une Issue sur GitHub. Toutes les propositions sont les bienvenues. 😊</p>
+      <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+        <a href="https://github.com/helioman32/whisper-helio/issues" class="btn-secondary" style="padding:10px 20px; font-size:0.85rem;">💬 Proposer une idée</a>
+        <a href="https://github.com/helioman32/whisper-helio" class="btn-secondary" style="padding:10px 20px; font-size:0.85rem;">★ GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SUPPORT -->
+<section class="section">
+  <div class="support-card">
+    <h2>☕ Soutenir le projet</h2>
+    <p>Whisper Hélio est un projet indépendant et gratuit, développé avec passion pendant mon temps libre. Si ce logiciel vous fait gagner du temps au quotidien, un petit soutien est toujours une immense motivation. Chaque contribution, même symbolique, me touche sincèrement. 🙏</p>
+    <a href="https://www.paypal.com/paypalme/heliostmalo" class="btn-paypal">
+      💙 Soutenir via PayPal
+    </a>
+    <p style="margin-top:20px; font-size:0.85rem;">Un grand merci à tous ceux qui utilisent et partagent Whisper Hélio — vous êtes la meilleure des récompenses !</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    <strong>Whisper Hélio v1.2</strong> — Réalisation Hélio — Février 2026 —
+    <a href="https://github.com/helioman32/whisper-helio">GitHub</a> —
+    Basé sur <a href="https://github.com/openai/whisper">OpenAI Whisper</a> et
+    <a href="https://github.com/guillaumekln/faster-whisper">faster-whisper</a> —
+    <a href="https://github.com/helioman32/whisper-helio/blob/main/LICENSE.txt">MIT License</a>
+  </p>
+</footer>
+
+<script>
+  // VU mètre animé
+  const vuBars = document.getElementById('vuBars');
+  const N = 28;
+  for (let i = 0; i < N; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'vu-bar';
+    const profile = Math.exp(-Math.pow((i - N/2) / (N/2), 2) * 2);
+    const h = Math.max(4, Math.round(profile * 28));
+    const d = (0.5 + Math.random() * 0.8).toFixed(2);
+    bar.style.cssText = `--h:${h}px; --d:${d}s; height:4px; animation-delay:${(i*0.03).toFixed(2)}s;`;
+    vuBars.appendChild(bar);
+  }
+
+  // Scroll reveal
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.opacity = '1';
+        e.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.feature-card, .step, .screenshot-card, .about-card, .support-card').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(30px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>
