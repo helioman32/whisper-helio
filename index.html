@@ -3,808 +3,376 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whisper Helio v1.3 — Dictée vocale Windows 100% offline</title>
-    <meta name="description" content="Application de dictée vocale gratuite pour Windows, 100% offline, basée sur OpenAI Whisper. Transcription rapide et précise sans connexion internet.">
-    <meta name="keywords" content="dictée vocale, whisper, speech to text, transcription, windows, offline, gratuit, français, voice dictation">
-    <meta name="author" content="Hélio">
+    <title>Whisper Helio v1.3 - Dictée vocale 100% offline</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://helioman32.github.io/whisper-helio/">
-    <meta property="og:title" content="Whisper Helio v1.3 — Dictée vocale Windows">
-    <meta property="og:description" content="Application de dictée vocale gratuite, 100% offline, basée sur OpenAI Whisper.">
-    <meta property="og:image" content="https://helioman32.github.io/whisper-helio/og-image.png">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://helioman32.github.io/whisper-helio/">
-    <meta property="twitter:title" content="Whisper Helio v1.3 — Dictée vocale Windows">
-    <meta property="twitter:description" content="Application de dictée vocale gratuite, 100% offline, basée sur OpenAI Whisper.">
-    
     <style>
-        :root {
-            --bg-dark: #1a1a2e;
-            --bg-darker: #0f0f1e;
-            --bg-card: rgba(255, 255, 255, 0.05);
-            --accent-green: #2ecc71;
-            --accent-green-dark: #27ae60;
-            --accent-purple: #7c3aed;
-            --accent-red: #e74c3c;
-            --accent-orange: #f39c12;
-            --accent-blue: #3498db;
-            --text-light: #ffffff;
-            --text-muted: #aaaaaa;
-            --border-light: rgba(255, 255, 255, 0.1);
-        }
-        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
         
-        html {
-            scroll-behavior: smooth;
-        }
-        
         body {
-            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darker) 100%);
-            color: var(--text-light);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
-            line-height: 1.7;
+            color: #ffffff;
+            line-height: 1.6;
         }
         
         .container {
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 40px 20px;
         }
         
-        /* ══════════════════════════════════════════════════════════════
-           HEADER
-           ══════════════════════════════════════════════════════════════ */
         header {
             text-align: center;
-            padding: 60px 0;
+            margin-bottom: 50px;
         }
         
         .logo {
-            width: 140px;
-            height: 140px;
-            margin-bottom: 25px;
-            border-radius: 28px;
-            box-shadow: 0 15px 50px rgba(46, 204, 113, 0.35);
-            transition: transform 0.3s ease;
-        }
-        
-        .logo:hover {
-            transform: scale(1.05);
+            font-size: 4rem;
+            margin-bottom: 10px;
         }
         
         h1 {
-            font-size: 3rem;
+            font-size: 2.8rem;
             margin-bottom: 10px;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-purple));
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         
-        .version-badge {
+        .version {
             display: inline-block;
-            background: linear-gradient(135deg, var(--accent-purple), #9b59b6);
-            color: white;
-            padding: 6px 16px;
-            border-radius: 25px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+            background: #2ecc71;
+            color: #1a1a2e;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
         }
         
         .tagline {
             font-size: 1.3rem;
-            color: var(--text-muted);
-            margin-bottom: 35px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+            color: #a0a0a0;
+            margin-bottom: 30px;
         }
         
-        /* Download Button */
+        .download-section {
+            background: rgba(46, 204, 113, 0.1);
+            border: 2px solid #2ecc71;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
         .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-green-dark));
-            color: white;
+            display: inline-block;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: #ffffff;
             text-decoration: none;
-            padding: 20px 45px;
+            padding: 20px 50px;
             border-radius: 50px;
-            font-size: 1.25rem;
-            font-weight: 700;
+            font-size: 1.3rem;
+            font-weight: bold;
             transition: all 0.3s ease;
-            box-shadow: 0 10px 35px rgba(46, 204, 113, 0.45);
+            box-shadow: 0 10px 30px rgba(46, 204, 113, 0.3);
         }
         
         .download-btn:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 15px 45px rgba(46, 204, 113, 0.55);
-        }
-        
-        .download-btn svg {
-            width: 26px;
-            height: 26px;
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(46, 204, 113, 0.4);
         }
         
         .download-info {
-            margin-top: 18px;
-            color: var(--text-muted);
+            margin-top: 20px;
+            color: #888;
             font-size: 0.95rem;
         }
         
-        /* ══════════════════════════════════════════════════════════════
-           NEW IN V1.3 SECTION
-           ══════════════════════════════════════════════════════════════ */
-        .new-section {
-            background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(46, 204, 113, 0.08));
-            border: 1px solid var(--accent-purple);
-            border-radius: 20px;
-            padding: 35px;
-            margin: 50px 0;
+        .download-info strong {
+            color: #2ecc71;
         }
         
-        .new-section h2 {
-            color: var(--accent-purple);
-            margin-bottom: 25px;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .new-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-        }
-        
-        .new-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-        
-        .new-item .icon {
-            font-size: 1.5rem;
-            flex-shrink: 0;
-        }
-        
-        .new-item strong {
-            color: var(--accent-green);
-        }
-        
-        .new-item p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-            margin-top: 4px;
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           FEATURES
-           ══════════════════════════════════════════════════════════════ */
         .features {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 25px;
-            margin: 60px 0;
+            margin-bottom: 40px;
         }
         
         .feature {
-            background: var(--bg-card);
-            padding: 30px;
-            border-radius: 18px;
-            border: 1px solid var(--border-light);
-            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: transform 0.3s ease;
         }
         
         .feature:hover {
-            transform: translateY(-6px);
-            border-color: var(--accent-green);
-            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+            transform: translateY(-5px);
         }
         
         .feature-icon {
             font-size: 2.5rem;
-            margin-bottom: 18px;
+            margin-bottom: 15px;
         }
         
         .feature h3 {
-            color: var(--accent-green);
-            margin-bottom: 12px;
-            font-size: 1.2rem;
+            color: #2ecc71;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
         }
         
         .feature p {
-            color: var(--text-muted);
+            color: #a0a0a0;
             font-size: 0.95rem;
         }
         
-        /* ══════════════════════════════════════════════════════════════
-           STATS
-           ══════════════════════════════════════════════════════════════ */
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin: 50px 0;
-        }
-        
-        .stat {
-            text-align: center;
-            padding: 25px;
-            background: var(--bg-card);
-            border-radius: 16px;
-            border: 1px solid var(--border-light);
-        }
-        
-        .stat-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-purple));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .stat-label {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           HOW IT WORKS
-           ══════════════════════════════════════════════════════════════ */
-        .how-it-works {
-            margin: 60px 0;
-        }
-        
-        .how-it-works h2 {
-            text-align: center;
+        .new-features {
+            background: rgba(243, 156, 18, 0.1);
+            border: 1px solid #f39c12;
+            border-radius: 15px;
+            padding: 30px;
             margin-bottom: 40px;
-            font-size: 1.8rem;
         }
         
-        .steps {
-            display: flex;
-            justify-content: space-between;
-            gap: 30px;
-            flex-wrap: wrap;
+        .new-features h2 {
+            color: #f39c12;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
         }
         
-        .step {
-            flex: 1;
-            min-width: 200px;
-            text-align: center;
+        .new-features ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+        }
+        
+        .new-features li {
+            padding: 8px 0;
+            padding-left: 30px;
             position: relative;
         }
         
-        .step-number {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--accent-green), var(--accent-green-dark));
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.4rem;
-            font-weight: 700;
-            margin: 0 auto 15px;
+        .new-features li::before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #2ecc71;
+            font-weight: bold;
         }
         
-        .step h3 {
-            margin-bottom: 10px;
-            color: var(--text-light);
-        }
-        
-        .step p {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           SHORTCUTS TABLE
-           ══════════════════════════════════════════════════════════════ */
-        .shortcuts {
-            margin: 60px 0;
-        }
-        
-        .shortcuts h2 {
-            margin-bottom: 25px;
-            font-size: 1.5rem;
-        }
-        
-        .shortcut-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: var(--bg-card);
-            border-radius: 16px;
-            overflow: hidden;
-        }
-        
-        .shortcut-table th,
-        .shortcut-table td {
-            padding: 18px 20px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-light);
-        }
-        
-        .shortcut-table th {
-            background: rgba(124, 58, 237, 0.2);
-            color: var(--accent-purple);
-            font-weight: 600;
-        }
-        
-        .shortcut-table tr:last-child td {
-            border-bottom: none;
-        }
-        
-        .shortcut-table tr:hover {
-            background: rgba(255, 255, 255, 0.03);
-        }
-        
-        .key {
-            display: inline-block;
-            background: var(--bg-darker);
-            padding: 6px 14px;
-            border-radius: 8px;
-            font-family: 'Consolas', 'Monaco', monospace;
-            border: 1px solid var(--border-light);
-            font-size: 0.9rem;
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           REQUIREMENTS
-           ══════════════════════════════════════════════════════════════ */
         .requirements {
-            background: var(--bg-card);
-            border-radius: 20px;
-            padding: 35px;
-            margin: 60px 0;
-            border: 1px solid var(--border-light);
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
         }
         
         .requirements h2 {
-            margin-bottom: 25px;
-            font-size: 1.5rem;
+            color: #3498db;
+            margin-bottom: 20px;
         }
         
-        .req-grid {
+        .requirements ul {
+            list-style: none;
+        }
+        
+        .requirements li {
+            padding: 8px 0;
+            color: #c0c0c0;
+        }
+        
+        .shortcuts {
+            background: rgba(155, 89, 182, 0.1);
+            border: 1px solid #9b59b6;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .shortcuts h2 {
+            color: #9b59b6;
+            margin-bottom: 20px;
+        }
+        
+        .shortcut-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 25px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
         }
         
-        .req-item {
+        .shortcut {
             display: flex;
             align-items: center;
             gap: 15px;
         }
         
-        .req-item .icon {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, var(--accent-purple), #9b59b6);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            flex-shrink: 0;
+        .key {
+            background: #2d2d44;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-weight: bold;
+            color: #2ecc71;
+            border: 1px solid #444;
         }
         
-        .req-item strong {
-            display: block;
-            margin-bottom: 2px;
-        }
-        
-        .req-item small {
-            color: var(--text-muted);
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           SUPPORT SECTION
-           ══════════════════════════════════════════════════════════════ */
-        .support {
-            text-align: center;
-            margin: 60px 0;
-            padding: 50px;
-            background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(124, 58, 237, 0.1));
-            border-radius: 24px;
-            border: 1px solid var(--border-light);
-        }
-        
-        .support h2 {
-            margin-bottom: 15px;
-            font-size: 1.8rem;
-        }
-        
-        .support p {
-            color: var(--text-muted);
-            margin-bottom: 25px;
-            max-width: 500px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .paypal-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            background: linear-gradient(135deg, #0070ba, #005ea6);
-            color: white;
-            text-decoration: none;
-            padding: 16px 35px;
-            border-radius: 35px;
-            font-weight: 600;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 25px rgba(0, 112, 186, 0.4);
-        }
-        
-        .paypal-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 35px rgba(0, 112, 186, 0.5);
-        }
-        
-        .paypal-btn svg {
-            width: 24px;
-            height: 24px;
-        }
-        
-        /* ══════════════════════════════════════════════════════════════
-           FOOTER
-           ══════════════════════════════════════════════════════════════ */
         footer {
             text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-            border-top: 1px solid var(--border-light);
-            margin-top: 60px;
+            padding: 40px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 40px;
         }
         
         footer a {
-            color: var(--accent-green);
+            color: #2ecc71;
             text-decoration: none;
-            transition: color 0.2s;
+            margin: 0 15px;
+            transition: color 0.3s;
         }
         
         footer a:hover {
-            color: var(--accent-purple);
-            text-decoration: underline;
+            color: #27ae60;
         }
         
-        .footer-links {
-            margin: 15px 0;
-        }
-        
-        .footer-links a {
-            margin: 0 15px;
-        }
-        
-        .footer-credits {
+        .author {
             margin-top: 20px;
-            font-size: 0.85rem;
+            color: #666;
+            font-size: 0.9rem;
         }
         
-        /* ══════════════════════════════════════════════════════════════
-           RESPONSIVE
-           ══════════════════════════════════════════════════════════════ */
-        @media (max-width: 768px) {
+        @media (max-width: 600px) {
             h1 {
-                font-size: 2.2rem;
-            }
-            
-            .tagline {
-                font-size: 1.1rem;
+                font-size: 2rem;
             }
             
             .download-btn {
-                padding: 16px 32px;
+                padding: 15px 30px;
                 font-size: 1.1rem;
             }
             
-            .stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .steps {
-                flex-direction: column;
-            }
-            
             .container {
-                padding: 30px 15px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 1.8rem;
-            }
-            
-            .stats {
-                grid-template-columns: 1fr;
-            }
-            
-            .stat-value {
-                font-size: 1.8rem;
+                padding: 20px 15px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        
-        <!-- ══════════════════════════════════════════════════════════════
-             HEADER
-             ══════════════════════════════════════════════════════════════ -->
         <header>
-            <img src="whisper_helio_icon.png" alt="Whisper Helio Logo" class="logo">
+            <div class="logo">🎤</div>
             <h1>Whisper Helio</h1>
-            <span class="version-badge">✨ Version 1.3</span>
-            <p class="tagline">Dictée vocale Windows — 100% offline, 100% gratuit<br>Transformez votre voix en texte instantanément.</p>
-            
-            <a href="https://drive.google.com/file/d/1kMM0-09I21fZQzuFjcmXEflw6cXs52c0/view?usp=sharing" class="download-btn" target="_blank">
-                <svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-6-6h4V4h4v6h4l-6 6zm-6 2h12v2H6v-2z"/></svg>
-                Télécharger v1.3
-            </a>
-            <p class="download-info">Windows 10/11 • ~5.9 GB • Aucune installation requise</p>
+            <span class="version">v1.3</span>
+            <p class="tagline">Dictée vocale Windows 100% offline — Propulsé par OpenAI Whisper</p>
         </header>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             STATS
-             ══════════════════════════════════════════════════════════════ -->
-        <section class="stats">
-            <div class="stat">
-                <div class="stat-value">100%</div>
-                <div class="stat-label">Offline</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">40%</div>
-                <div class="stat-label">Plus rapide</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">220+</div>
-                <div class="stat-label">Tests passés</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">7</div>
-                <div class="stat-label">Langues</div>
-            </div>
+        <section class="download-section">
+            <a href="https://drive.google.com/file/d/VOTRE_ID_ICI/view?usp=sharing" class="download-btn">
+                ⬇️ Télécharger Whisper Helio v1.3
+            </a>
+            <p class="download-info">
+                <strong>Windows 10/11</strong> • Version portable • <strong>2.9 Go</strong><br>
+                Aucune installation requise — Fonctionne 100% hors ligne
+            </p>
         </section>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             NEW IN V1.3
-             ══════════════════════════════════════════════════════════════ -->
-        <section class="new-section">
+        <section class="new-features">
             <h2>🆕 Nouveautés v1.3</h2>
-            <div class="new-grid">
-                <div class="new-item">
-                    <span class="icon">🎨</span>
-                    <div>
-                        <strong>Interface modernisée</strong>
-                        <p>Boutons ronds élégants, animations fluides</p>
-                    </div>
-                </div>
-                <div class="new-item">
-                    <span class="icon">⚡</span>
-                    <div>
-                        <strong>40% plus rapide</strong>
-                        <p>Transcription et CPU optimisés</p>
-                    </div>
-                </div>
-                <div class="new-item">
-                    <span class="icon">🛡️</span>
-                    <div>
-                        <strong>Ultra stable</strong>
-                        <p>220+ passes de vérification du code</p>
-                    </div>
-                </div>
-                <div class="new-item">
-                    <span class="icon">🖱️</span>
-                    <div>
-                        <strong>Souris gaming</strong>
-                        <p>Boutons pouce X1/X2 fonctionnels</p>
-                    </div>
-                </div>
-                <div class="new-item">
-                    <span class="icon">📺</span>
-                    <div>
-                        <strong>Support 4K</strong>
-                        <p>DPI haute résolution géré</p>
-                    </div>
-                </div>
-                <div class="new-item">
-                    <span class="icon">🔧</span>
-                    <div>
-                        <strong>Meilleurs messages</strong>
-                        <p>Erreurs claires et actionnables</p>
-                    </div>
-                </div>
-            </div>
+            <ul>
+                <li>Splash screen au démarrage</li>
+                <li>Transcription 40% plus rapide</li>
+                <li>Consommation CPU réduite de 40%</li>
+                <li>Support souris gaming (boutons X1/X2)</li>
+                <li>Compatibilité écrans 4K améliorée</li>
+                <li>220+ tests de vérification</li>
+                <li>25 bugs corrigés</li>
+                <li>10 optimisations majeures</li>
+            </ul>
         </section>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             HOW IT WORKS
-             ══════════════════════════════════════════════════════════════ -->
-        <section class="how-it-works">
-            <h2>🚀 Comment ça marche ?</h2>
-            <div class="steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h3>Appuyez</h3>
-                    <p>Maintenez F9 (ou votre raccourci) et parlez</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h3>Parlez</h3>
-                    <p>Le VU-mètre réagit à votre voix</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h3>Relâchez</h3>
-                    <p>Whisper transcrit en quelques secondes</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <h3>Terminé !</h3>
-                    <p>Le texte est collé automatiquement</p>
-                </div>
-            </div>
-        </section>
-        
-        <!-- ══════════════════════════════════════════════════════════════
-             FEATURES
-             ══════════════════════════════════════════════════════════════ -->
         <section class="features">
             <div class="feature">
                 <div class="feature-icon">🔒</div>
                 <h3>100% Offline</h3>
-                <p>Aucune donnée envoyée sur internet. Tout reste sur votre PC. Confidentialité totale garantie.</p>
+                <p>Vos données restent sur votre PC. Aucune connexion internet requise après installation.</p>
             </div>
-            
             <div class="feature">
                 <div class="feature-icon">⚡</div>
-                <h3>Ultra rapide</h3>
-                <p>Transcription quasi-instantanée avec GPU NVIDIA. Fonctionne aussi sur CPU.</p>
+                <h3>Ultra Rapide</h3>
+                <p>Transcription quasi-instantanée avec accélération GPU NVIDIA (CUDA).</p>
             </div>
-            
             <div class="feature">
                 <div class="feature-icon">🎯</div>
-                <h3>Précision Whisper</h3>
-                <p>Basé sur OpenAI Whisper, le meilleur modèle de reconnaissance vocale au monde.</p>
+                <h3>Précision Pro</h3>
+                <p>Modèle Whisper large-v3 pour une reconnaissance vocale de qualité professionnelle.</p>
             </div>
-            
             <div class="feature">
                 <div class="feature-icon">🌍</div>
                 <h3>Multilingue</h3>
-                <p>Français, anglais, espagnol, allemand, italien, portugais, néerlandais.</p>
+                <p>Français, anglais, allemand, espagnol, italien, portugais, néerlandais.</p>
             </div>
-            
             <div class="feature">
-                <div class="feature-icon">🎮</div>
-                <h3>Raccourcis flexibles</h3>
-                <p>F9-F12 ou boutons pouce de souris gaming. Entièrement personnalisable.</p>
+                <div class="feature-icon">📋</div>
+                <h3>Copie Auto</h3>
+                <p>Le texte transcrit est automatiquement copié et collé dans votre application.</p>
             </div>
-            
             <div class="feature">
-                <div class="feature-icon">🆓</div>
-                <h3>Gratuit pour toujours</h3>
-                <p>Open source, sans publicité, sans abonnement, sans limite d'utilisation.</p>
+                <div class="feature-icon">🎨</div>
+                <h3>Thèmes</h3>
+                <p>Mode sombre et clair. Interface compacte et non-intrusive.</p>
             </div>
         </section>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             SHORTCUTS
-             ══════════════════════════════════════════════════════════════ -->
         <section class="shortcuts">
-            <h2>⌨️ Raccourcis clavier</h2>
-            <table class="shortcut-table">
-                <thead>
-                    <tr>
-                        <th>Raccourci</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><span class="key">F9</span> <small>(par défaut)</small></td>
-                        <td>Maintenir pour dicter, relâcher pour transcrire</td>
-                    </tr>
-                    <tr>
-                        <td><span class="key">F10</span> <span class="key">F11</span> <span class="key">F12</span></td>
-                        <td>Raccourcis alternatifs (configurables)</td>
-                    </tr>
-                    <tr>
-                        <td><span class="key">🖱️ Bouton pouce</span></td>
-                        <td>Souris gaming X1 ou X2 (configurable)</td>
-                    </tr>
-                    <tr>
-                        <td><span class="key">⏺ Bouton vert</span></td>
-                        <td>Mode réunion — enregistrement continu toutes les 5s</td>
-                    </tr>
-                </tbody>
-            </table>
+            <h2>⌨️ Raccourcis</h2>
+            <div class="shortcut-grid">
+                <div class="shortcut">
+                    <span class="key">F9</span>
+                    <span>Maintenir pour dicter</span>
+                </div>
+                <div class="shortcut">
+                    <span class="key">🟢</span>
+                    <span>Mode réunion (continu)</span>
+                </div>
+                <div class="shortcut">
+                    <span class="key">⚙️</span>
+                    <span>Paramètres</span>
+                </div>
+                <div class="shortcut">
+                    <span class="key">X1/X2</span>
+                    <span>Boutons souris gaming</span>
+                </div>
+            </div>
         </section>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             REQUIREMENTS
-             ══════════════════════════════════════════════════════════════ -->
         <section class="requirements">
             <h2>📋 Configuration requise</h2>
-            <div class="req-grid">
-                <div class="req-item">
-                    <div class="icon">💻</div>
-                    <div>
-                        <strong>Windows 10/11</strong>
-                        <small>64 bits requis</small>
-                    </div>
-                </div>
-                <div class="req-item">
-                    <div class="icon">🧠</div>
-                    <div>
-                        <strong>8 GB RAM</strong>
-                        <small>16 GB recommandé</small>
-                    </div>
-                </div>
-                <div class="req-item">
-                    <div class="icon">🎮</div>
-                    <div>
-                        <strong>GPU NVIDIA</strong>
-                        <small>Optionnel, RTX recommandé</small>
-                    </div>
-                </div>
-                <div class="req-item">
-                    <div class="icon">🎤</div>
-                    <div>
-                        <strong>Microphone</strong>
-                        <small>Intégré ou externe</small>
-                    </div>
-                </div>
-            </div>
+            <ul>
+                <li>🖥️ Windows 10 ou 11 (64 bits)</li>
+                <li>💾 4 Go de RAM minimum (8 Go recommandé)</li>
+                <li>💿 6 Go d'espace disque</li>
+                <li>🎤 Microphone</li>
+                <li>🎮 GPU NVIDIA recommandé (CUDA) — Fonctionne aussi en CPU</li>
+            </ul>
         </section>
         
-        <!-- ══════════════════════════════════════════════════════════════
-             SUPPORT
-             ══════════════════════════════════════════════════════════════ -->
-        <section class="support">
-            <h2>❤️ Soutenir le projet</h2>
-            <p>Whisper Helio est gratuit et le restera. Si vous l'appréciez, vous pouvez soutenir son développement.</p>
-            <a href="https://www.paypal.com/paypalme/heliostmalo" class="paypal-btn" target="_blank" rel="noopener">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.77.77 0 0 1 .76-.654h6.233c2.07 0 3.67.514 4.753 1.528 1.073 1.004 1.433 2.39 1.069 4.12l-.003.014c-.398 1.966-1.296 3.4-2.674 4.264-1.336.838-3.042 1.263-5.07 1.263H8.2a.77.77 0 0 0-.76.654l-.796 5.04-.137.87a.641.641 0 0 1-.633.538h-.798z"/></svg>
-                Faire un don PayPal
-            </a>
-        </section>
-        
-        <!-- ══════════════════════════════════════════════════════════════
-             FOOTER
-             ══════════════════════════════════════════════════════════════ -->
         <footer>
-            <p>Créé avec ❤️ par <strong>Hélio</strong> — Bretagne, France</p>
-            <div class="footer-links">
-                <a href="https://github.com/helioman32/whisper-helio" target="_blank" rel="noopener">GitHub</a>
-                <a href="https://github.com/helioman32/whisper-helio/issues" target="_blank" rel="noopener">Support</a>
-                <a href="https://github.com/helioman32/whisper-helio/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
-            </div>
-            <p class="footer-credits">
-                Basé sur <a href="https://github.com/openai/whisper" target="_blank" rel="noopener">OpenAI Whisper</a> 
-                et <a href="https://github.com/guillaumekln/faster-whisper" target="_blank" rel="noopener">faster-whisper</a>
+            <a href="https://github.com/helimusic/whisper-helio">📂 GitHub</a>
+            <a href="https://github.com/helimusic/whisper-helio/releases">📦 Releases</a>
+            <a href="https://www.paypal.com/paypalme/heliostmalo">💚 Soutenir le projet</a>
+            <p class="author">
+                Créé avec ❤️ par Hélio • Bretagne, France<br>
+                Licence MIT — 2024-2026
             </p>
         </footer>
-        
     </div>
 </body>
 </html>
