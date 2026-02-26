@@ -110,23 +110,9 @@ Basé sur [OpenAI Whisper](https://github.com/openai/whisper) et [faster-whisper
 
 ---
 
-## 👤 L'auteur
-
-Je m'appelle **Hélio**, je suis basé en **Bretagne** (France). J'ai créé Whisper Hélio parce que j'avais besoin d'un outil de dictée vocale simple, rapide et qui respecte ma vie privée — sans abonnement, sans cloud, sans compromis.
-
-En 2028, je prévois de m'installer au **Canada** pour rejoindre ma compagne, chercheuse. Ce projet m'accompagne dans cette aventure !
-
-Si vous avez des idées d'amélioration, des suggestions de fonctionnalités ou simplement envie d'échanger — n'hésitez pas à ouvrir une **Issue** sur GitHub ou à me contacter. Toutes les propositions sont les bienvenues. 😊
-
----
-
 ## ☕ Soutenir le projet
 
-Whisper Hélio est un projet indépendant et gratuit, développé avec passion pendant mon temps libre.
-
-Si ce logiciel vous fait gagner du temps au quotidien, un petit soutien est toujours une immense motivation pour continuer à améliorer le projet et publier de nouvelles versions. Chaque contribution, même symbolique, compte énormément et me touche sincèrement. 🙏
-
-Un grand merci à toutes les personnes qui utilisent Whisper Hélio et qui prennent le temps de le partager autour d'elles — vous êtes la meilleure des récompenses !
+Whisper Hélio est un projet indépendant et gratuit. Si ce logiciel vous est utile :
 
 [![Soutenir le projet](https://img.shields.io/badge/Faire%20un%20don-PayPal-blue.svg)](https://paypal.me/heliostmalo)
 
