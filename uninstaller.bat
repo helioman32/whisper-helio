@@ -1,100 +1,66 @@
 @echo off
-title Whisper Helio - Desinstallation
-color 0C
-cls
-
-if "%1"=="" (
-    cmd /k "%~f0" run
-    exit /b
-)
+chcp 65001 >nul
+title Désinstallation Whisper Helio v1.3
 
 echo.
-echo  ==========================================
-echo      WHISPER HELIO v1.2 - Desinstallation
-echo  ==========================================
+echo  ╔══════════════════════════════════════════════════════════════╗
+echo  ║         DÉSINSTALLATION WHISPER HELIO v1.3                   ║
+echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
-
-set "DESKTOP=%USERPROFILE%\Desktop"
-set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "SCRIPT_DIR=%~dp0"
-
-:: ── Fermeture du logiciel ─────────────────────────────────────────────────
-echo  [1/4] Fermeture de Whisper Helio...
-taskkill /f /im "Whisper Helio.exe" >nul 2>&1
-echo  OK !
+echo  Ce script va supprimer :
+echo    - Le fichier de configuration
+echo    - Le fichier de log
+echo    - Le cache du modèle Whisper (optionnel)
 echo.
-
-:: ── Suppression raccourci Bureau ─────────────────────────────────────────
-echo  [2/4] Suppression du raccourci Bureau...
-if exist "%DESKTOP%\Whisper Helio.lnk" (
-    del "%DESKTOP%\Whisper Helio.lnk"
-    echo  OK - Raccourci Bureau supprime !
-) else (
-    echo  (aucun raccourci trouve sur le Bureau)
-)
+echo  L'application elle-même ne sera pas supprimée.
+echo  Vous pouvez simplement supprimer le dossier manuellement.
 echo.
+pause
 
-:: ── Suppression demarrage automatique ────────────────────────────────────
-echo  [3/4] Suppression du demarrage automatique...
-if exist "%STARTUP%\Whisper Helio.lnk" (
-    del "%STARTUP%\Whisper Helio.lnk"
-    echo  OK - Demarrage automatique supprime !
-) else (
-    echo  (aucune entree de demarrage automatique trouvee)
-)
 echo.
-
-:: ── Suppression fichiers de configuration ────────────────────────────────
-echo  [4/4] Suppression des fichiers de configuration...
+echo [1/3] Suppression du fichier de configuration...
 if exist "%USERPROFILE%\whisper_helio_config.json" (
     del "%USERPROFILE%\whisper_helio_config.json"
-    echo  OK - Configuration supprimee !
+    echo       OK - Configuration supprimée
+) else (
+    echo       Fichier non trouvé (déjà supprimé)
 )
+
+echo.
+echo [2/3] Suppression du fichier de log...
 if exist "%USERPROFILE%\whisper_helio_crash.log" (
     del "%USERPROFILE%\whisper_helio_crash.log"
-    echo  OK - Fichier de log supprime !
+    echo       OK - Log supprimé
+) else (
+    echo       Fichier non trouvé (déjà supprimé)
 )
-echo.
 
-:: ── Cache modeles Whisper ────────────────────────────────────────────────
-echo  ==========================================
 echo.
-echo  Voulez-vous supprimer le cache des modeles
-echo  Whisper (~3 Go) ? (O/N)
-echo  (Ces fichiers seront retelecharges si vous
-echo   reinstallez le logiciel)
+echo [3/3] Cache du modèle Whisper...
 echo.
-set /p CACHE=
-if /i "%CACHE%"=="O" (
-    if exist "%USERPROFILE%\.cache\huggingface" (
-        rmdir /s /q "%USERPROFILE%\.cache\huggingface"
-        echo  OK - Cache Whisper supprime !
+echo  Le cache Whisper peut prendre plusieurs Go.
+echo  Voulez-vous le supprimer ? (Vous devrez re-télécharger le modèle)
+echo.
+set /p choix="Supprimer le cache Whisper ? (O/N) : "
+if /i "%choix%"=="O" (
+    if exist "%USERPROFILE%\.cache\huggingface\hub" (
+        rmdir /s /q "%USERPROFILE%\.cache\huggingface\hub"
+        echo       OK - Cache Whisper supprimé
     ) else (
-        echo  (aucun cache trouve)
+        echo       Cache non trouvé
     )
+) else (
+    echo       Cache conservé
 )
-echo.
 
-:: ── Suppression dossier logiciel ────────────────────────────────────────
-echo  ==========================================
 echo.
-echo  Voulez-vous supprimer le dossier complet
-echo  de Whisper Helio ? (O/N)
-echo  ATTENTION : cette action est irreversible !
+echo  ╔══════════════════════════════════════════════════════════════╗
+echo  ║              DÉSINSTALLATION TERMINÉE                        ║
+echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
-set /p FOLDER=
-if /i "%FOLDER%"=="O" (
-    echo.
-    echo  Suppression du dossier en cours...
-    cd "%USERPROFILE%"
-    rmdir /s /q "%SCRIPT_DIR%"
-    echo  OK - Dossier supprime !
-)
+echo  Vous pouvez maintenant supprimer le dossier Whisper Helio.
 echo.
-
-echo  ==========================================
-echo    Desinstallation terminee !
-echo    Merci d'avoir utilise Whisper Helio.
-echo  ==========================================
+echo  Merci d'avoir utilisé Whisper Helio !
+echo  https://github.com/helioman32/whisper-helio
 echo.
 pause
