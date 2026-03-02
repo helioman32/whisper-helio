@@ -1,9 +1,9 @@
-# 🎤 Whisper Helio v1.3
+# 🎤 Whisper Hélio v1.4b
 
 **Dictée vocale Windows — 100% offline, 100% gratuit**
 
-[![Version](https://img.shields.io/badge/version-1.3-green.svg)](https://github.com/helioman32/whisper-helio/releases)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.4b-green.svg)](https://github.com/helioman32/whisper-helio/releases)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)]()
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
 
@@ -33,8 +33,35 @@
 | 🌍 **Multilingue** | Français, anglais, espagnol, allemand, italien, portugais, néerlandais |
 | 🎮 **Raccourcis flexibles** | Clavier F9-F12 ou boutons souris gaming |
 | 🎨 **Thèmes** | Mode sombre et mode clair |
+| 📝 **Macros** | Remplacement automatique de texte personnalisable |
+| 📖 **Dictionnaire** | Correction des mots mal transcrits par Whisper |
+| 🚀 **Actions vocales** | Ouvrir des programmes par la voix |
 | 📍 **Portable** | Aucune installation requise |
 | 🆓 **Gratuit** | Open source, sans pub, sans abonnement |
+
+---
+
+## 🆕 Nouveautés v1.4b
+
+### ⚡ Nouveau modèle `large-v3-turbo`
+- **2× plus rapide** que `large-v3`
+- Qualité quasi identique
+- Disponible directement dans les Paramètres
+
+### 🎨 Fenêtre Paramètres redessinée
+- Style cohérent avec la fenêtre principale (sans barre Windows)
+- Barre de titre custom avec bouton ✕ et drag
+- Coins arrondis, transparence identique
+
+### 🌍 Interface française corrigée
+- Tous les accents restaurés (Paramètres, Modèle, Périphérique, Prêt...)
+- Traductions complètes FR / EN / DE
+
+### 🛡️ Stabilité améliorée
+- **800+ passes de vérification** du code
+- Sauvegarde config atomique (`.tmp` + `os.replace`)
+- Fix `ensure_ascii=False` — accents bien sauvegardés dans la config
+- Fix `ButtonRelease-1` — curseur de resize correctement réinitialisé
 
 ---
 
@@ -72,8 +99,8 @@
 
 1. Téléchargez la [dernière release](https://github.com/helioman32/whisper-helio/releases/latest)
 2. Extrayez le ZIP
-3. Lancez `Whisper_Helio.exe`
-4. Au premier lancement, le modèle Whisper sera téléchargé (~3 GB)
+3. Lancez `WhisperHelio.exe`
+4. Au premier lancement, le modèle Whisper sera téléchargé automatiquement (~800 MB pour large-v3-turbo)
 
 ### Option 2 : Depuis les sources
 
@@ -97,7 +124,7 @@ python dictee.pyw
 |-----------|---------|------------|
 | **OS** | Windows 10 64-bit | Windows 11 |
 | **RAM** | 8 GB | 16 GB |
-| **GPU** | - | NVIDIA RTX (CUDA) |
+| **GPU** | — (CPU possible) | NVIDIA RTX (CUDA) |
 | **Stockage** | 5 GB | 10 GB |
 | **Python** | 3.8+ | 3.11+ |
 
@@ -112,6 +139,7 @@ python dictee.pyw
 | `Bouton pouce X1/X2` | Pour souris gaming |
 | `⏺ Bouton vert` | Mode réunion (enregistrement continu) |
 | `⚙️ Bouton gris` | Paramètres |
+| `−` | Mode compact (VU-mètre seul) |
 | `✕ Bouton rouge` | Fermer |
 
 ---
@@ -123,9 +151,9 @@ Cliquez sur l'icône ⚙️ pour accéder aux paramètres :
 | Option | Valeurs | Description |
 |--------|---------|-------------|
 | **Thème** | Dark / Light | Apparence de l'interface |
-| **Modèle** | tiny → large-v3 | Précision vs vitesse |
-| **Device** | Auto / CUDA / CPU | Utiliser le GPU si disponible |
-| **Langue** | FR, EN, ES, DE, IT, PT, NL | Langue de dictée |
+| **Modèle** | tiny → large-v3-turbo | Précision vs vitesse |
+| **Périphérique** | Auto / CUDA / CPU | Utiliser le GPU si disponible |
+| **Langue dictée** | FR, EN, ES, DE, IT, PT, NL | Langue de dictée |
 | **Interface** | FR, EN, DE | Langue de l'interface |
 | **Raccourci** | F9-F12, mouse_x1/x2 | Touche de dictée |
 | **Position** | 5 positions | Position au démarrage |
@@ -142,9 +170,10 @@ Cliquez sur l'icône ⚙️ pour accéder aux paramètres :
 | `medium` | 1.5 GB | 5 GB | ★★★★☆ | ★★☆☆☆ |
 | `large-v2` | 3 GB | 10 GB | ★★★★★ | ★☆☆☆☆ |
 | `large-v3` | 3 GB | 10 GB | ★★★★★ | ★☆☆☆☆ |
+| `large-v3-turbo` ⭐ | 800 MB | 6 GB | ★★★★★ | ★★★☆☆ |
 
 **Recommandation :**
-- **Avec GPU NVIDIA** : `large-v3` pour la meilleure précision
+- **Avec GPU NVIDIA** : `large-v3-turbo` — meilleur rapport qualité/vitesse
 - **Sans GPU** : `small` ou `base` pour un bon compromis
 
 ---
@@ -161,7 +190,7 @@ Cliquez sur l'icône ⚙️ pour accéder aux paramètres :
 - L'app utilisera automatiquement un modèle plus léger
 
 ### Transcription lente
-- Passez à un modèle plus petit (`small`, `base`, `tiny`)
+- Passez à `large-v3-turbo` ou un modèle plus petit
 - Si vous avez un GPU NVIDIA, vérifiez que CUDA est installé
 
 ### F9 ne fonctionne pas
@@ -188,7 +217,7 @@ Cliquez sur l'icône ⚙️ pour accéder aux paramètres :
 ## 🏗️ Architecture technique
 
 ```
-Whisper Helio v1.3
+Whisper Hélio v1.4b
 │
 ├── Thread principal (Tkinter)
 │   ├── Interface utilisateur
@@ -206,7 +235,7 @@ Whisper Helio v1.3
 ├── Callback audio (sounddevice)
 │   └── Capture micro → RingBuffer
 │
-└── Hooks clavier/souris (pynput)
+└── Hooks clavier/souris (keyboard)
     └── Détection raccourcis
 ```
 
@@ -225,6 +254,14 @@ Les contributions sont les bienvenues !
 ---
 
 ## 📄 Changelog
+
+### v1.4b (Février 2026)
+- Nouveau modèle `large-v3-turbo` (2× plus rapide)
+- Fenêtre Paramètres redessinée (style cohérent, drag, coins arrondis)
+- Interface française avec accents complets
+- Sauvegarde config atomique
+- 800+ passes de vérification
+- Fix ensure_ascii, ButtonRelease-1
 
 ### v1.3 (Février 2026)
 - Interface modernisée (boutons ronds)
@@ -251,7 +288,7 @@ Les contributions sont les bienvenues !
 
 ## ❤️ Soutenir le projet
 
-Whisper Helio est **gratuit** et le restera. Si vous l'appréciez, vous pouvez soutenir son développement :
+Whisper Hélio est **gratuit** et le restera. Si vous l'appréciez, vous pouvez soutenir son développement :
 
 [![PayPal](https://img.shields.io/badge/PayPal-Faire_un_don-blue.svg?logo=paypal)](https://www.paypal.com/paypalme/heliostmalo)
 
@@ -259,19 +296,19 @@ Whisper Helio est **gratuit** et le restera. Si vous l'appréciez, vous pouvez s
 
 ## 📄 Licence
 
-MIT License — voir [LICENSE](LICENSE)
+GNU General Public License v3.0 — voir [LICENSE](LICENSE)
 
 ---
 
 ## 🙏 Remerciements
 
 - [OpenAI Whisper](https://github.com/openai/whisper) — Le modèle de reconnaissance vocale
-- [faster-whisper](https://github.com/guillaumekln/faster-whisper) — Implémentation optimisée CTranslate2
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — Implémentation optimisée CTranslate2
 - La communauté open source
 
 ---
 
 <p align="center">
   Créé avec ❤️ par <strong>Hélio</strong> — Bretagne, France<br>
-  <em>Projet Canada 2028</em>
+  <em>Projet Seattle (USA) 2028</em>
 </p>

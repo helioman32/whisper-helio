@@ -1,0 +1,26 @@
+# Whisper Helio v1.4b - Dépendances Python
+# Installation: pip install -r requirements.txt
+
+# Transcription vocale
+faster-whisper>=0.10.0
+
+# Audio
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# Presse-papier et automation
+pyperclip>=1.8.2
+pyautogui>=0.9.54
+
+# Clavier (hooks globaux Windows)
+keyboard>=0.13.5
+# Note : pynput retiré — le code utilise keyboard, pas pynput
+
+# GPU (optionnel - pour accélération CUDA)
+# Décommenter si vous avez une carte NVIDIA
+# torch>=2.0.0
+# torchvision>=0.15.0
+# torchaudio>=2.0.0
+
+# Note: torch avec CUDA doit être installé séparément:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118

@@ -3,850 +3,1282 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Whisper Helio v1.3 - Dictée vocale 100% offline</title>
+    <title>Whisper Hélio v1.4b — Dictée vocale 100% offline</title>
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg: #080c14;
+            --bg2: #0d1420;
+            --surface: rgba(255,255,255,0.04);
+            --surface2: rgba(255,255,255,0.07);
+            --cyan: #00e5ff;
+            --cyan2: #00b8d4;
+            --green: #00e676;
+            --amber: #ffc400;
+            --red: #ff5252;
+            --purple: #7c4dff;
+            --text: #e8eaf0;
+            --muted: #6b7280;
+            --border: rgba(255,255,255,0.08);
         }
-        
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
             line-height: 1.6;
+            overflow-x: hidden;
         }
-        
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 40px 20px;
+
+        /* ── NOISE TEXTURE ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.4;
         }
-        
-        header {
+
+        /* ── NAV ── */
+        nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            padding: 16px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(8,12,20,0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: 1.1rem;
+            color: var(--cyan);
+            letter-spacing: -0.02em;
+            text-decoration: none;
+        }
+
+        .nav-links { display: flex; gap: 32px; list-style: none; }
+        .nav-links a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: color 0.2s;
+            letter-spacing: 0.02em;
+        }
+        .nav-links a:hover { color: var(--text); }
+
+        .nav-cta {
+            background: var(--cyan);
+            color: var(--bg) !important;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-weight: 600 !important;
+            transition: opacity 0.2s !important;
+        }
+        .nav-cta:hover { opacity: 0.85; }
+
+        /* ── HERO ── */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
-            margin-bottom: 50px;
+            padding: 120px 40px 80px;
+            position: relative;
+            overflow: hidden;
         }
-        
-        .logo {
-            font-size: 5rem;
-            margin-bottom: 15px;
+
+        /* Radial glow behind hero */
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 700px; height: 700px;
+            background: radial-gradient(circle, rgba(0,229,255,0.07) 0%, transparent 70%);
+            pointer-events: none;
         }
-        
+
+        /* WAVEFORM ANIMATION */
+        .waveform {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 60px;
+            margin-bottom: 40px;
+        }
+
+        .wave-bar {
+            width: 3px;
+            border-radius: 2px;
+            background: var(--cyan);
+            animation: wave 1.4s ease-in-out infinite;
+            opacity: 0.8;
+        }
+
+        .wave-bar:nth-child(1)  { height: 15px; animation-delay: 0s; }
+        .wave-bar:nth-child(2)  { height: 28px; animation-delay: 0.1s; }
+        .wave-bar:nth-child(3)  { height: 45px; animation-delay: 0.2s; }
+        .wave-bar:nth-child(4)  { height: 55px; animation-delay: 0.3s; }
+        .wave-bar:nth-child(5)  { height: 40px; animation-delay: 0.4s; }
+        .wave-bar:nth-child(6)  { height: 58px; animation-delay: 0.5s; }
+        .wave-bar:nth-child(7)  { height: 50px; animation-delay: 0.45s; }
+        .wave-bar:nth-child(8)  { height: 35px; animation-delay: 0.35s; }
+        .wave-bar:nth-child(9)  { height: 48px; animation-delay: 0.25s; }
+        .wave-bar:nth-child(10) { height: 60px; animation-delay: 0.15s; }
+        .wave-bar:nth-child(11) { height: 42px; animation-delay: 0.05s; }
+        .wave-bar:nth-child(12) { height: 30px; animation-delay: 0.55s; }
+        .wave-bar:nth-child(13) { height: 52px; animation-delay: 0.65s; }
+        .wave-bar:nth-child(14) { height: 38px; animation-delay: 0.75s; }
+        .wave-bar:nth-child(15) { height: 20px; animation-delay: 0.85s; }
+        .wave-bar:nth-child(16) { height: 45px; animation-delay: 0.7s; }
+        .wave-bar:nth-child(17) { height: 55px; animation-delay: 0.6s; }
+        .wave-bar:nth-child(18) { height: 32px; animation-delay: 0.5s; }
+        .wave-bar:nth-child(19) { height: 18px; animation-delay: 0.4s; }
+        .wave-bar:nth-child(20) { height: 10px; animation-delay: 0.3s; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(0.4); opacity: 0.4; }
+            50% { transform: scaleY(1); opacity: 1; }
+        }
+
+        .hero-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0,229,255,0.1);
+            border: 1px solid rgba(0,229,255,0.25);
+            color: var(--cyan);
+            padding: 6px 16px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+        }
+
+        .hero-tag::before {
+            content: '';
+            width: 6px; height: 6px;
+            background: var(--cyan);
+            border-radius: 50%;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.7); }
+        }
+
         h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            font-size: clamp(3rem, 8vw, 6rem);
+            letter-spacing: -0.04em;
+            line-height: 1;
+            margin-bottom: 12px;
+        }
+
+        h1 span {
+            background: linear-gradient(135deg, var(--cyan) 0%, var(--green) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
-        .version {
-            display: inline-block;
-            background: #2ecc71;
-            color: #1a1a2e;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 0.9rem;
-            margin-bottom: 15px;
+
+        .hero-version {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 20px;
         }
-        
-        .tagline {
-            font-size: 1.4rem;
-            color: #a0a0a0;
-            margin-bottom: 10px;
+
+        .hero-tagline {
+            font-size: clamp(1rem, 2.5vw, 1.35rem);
+            color: var(--muted);
+            max-width: 520px;
+            margin-bottom: 48px;
+            font-weight: 300;
         }
-        
-        .subtitle {
-            font-size: 1.1rem;
-            color: #2ecc71;
-            font-style: italic;
+
+        .hero-buttons {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 60px;
         }
-        
-        .badges {
-            margin: 20px 0;
-        }
-        
-        .badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 5px;
-            font-size: 0.8rem;
-            margin: 3px;
-        }
-        
-        .badge-green { background: #27ae60; }
-        .badge-blue { background: #3498db; }
-        .badge-grey { background: #666; }
-        
-        /* Download Section */
-        .download-section {
-            background: rgba(46, 204, 113, 0.1);
-            border: 2px solid #2ecc71;
-            border-radius: 20px;
-            padding: 40px;
-            text-align: center;
-            margin-bottom: 40px;
-        }
-        
-        .download-btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #2ecc71, #27ae60);
-            color: #ffffff;
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--cyan);
+            color: var(--bg);
+            padding: 16px 36px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
             text-decoration: none;
-            padding: 20px 50px;
-            border-radius: 50px;
-            font-size: 1.3rem;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(46, 204, 113, 0.3);
-            margin: 10px;
+            transition: all 0.2s;
+            box-shadow: 0 0 40px rgba(0,229,255,0.2);
         }
-        
-        .download-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(46, 204, 113, 0.4);
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 60px rgba(0,229,255,0.35);
         }
-        
-        .download-btn-secondary {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.3);
+
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface2);
+            color: var(--text);
+            padding: 16px 36px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            transition: all 0.2s;
         }
-        
-        .download-btn-secondary:hover {
-            box-shadow: 0 15px 40px rgba(52, 152, 219, 0.4);
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-2px);
         }
-        
-        .download-info {
-            margin-top: 20px;
-            color: #888;
-            font-size: 0.95rem;
+
+        .hero-meta {
+            display: flex;
+            gap: 32px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+            justify-content: center;
         }
-        
-        .download-info strong {
-            color: #2ecc71;
+
+        .hero-meta span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
-        
-        /* Sections */
-        section {
-            margin-bottom: 40px;
-        }
-        
-        h2 {
-            font-size: 1.8rem;
-            margin-bottom: 25px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #2ecc71;
-        }
-        
-        h3 {
-            color: #2ecc71;
-            margin: 20px 0 10px 0;
-        }
-        
-        /* Features Grid */
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        .feature {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 25px;
-            transition: transform 0.3s ease;
-        }
-        
-        .feature:hover {
-            transform: translateY(-5px);
-        }
-        
-        .feature-icon {
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-        
-        .feature h3 {
-            margin-bottom: 10px;
-            font-size: 1.1rem;
-        }
-        
-        .feature p {
-            color: #a0a0a0;
-            font-size: 0.95rem;
-        }
-        
-        /* New Features */
-        .new-features {
-            background: rgba(243, 156, 18, 0.1);
-            border: 1px solid #f39c12;
-            border-radius: 15px;
-            padding: 30px;
-        }
-        
-        .new-features h2 {
-            color: #f39c12;
-            border-color: #f39c12;
-        }
-        
-        .new-features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 25px;
-        }
-        
-        .new-feature-category h3 {
-            color: #f39c12;
-            margin-bottom: 15px;
-        }
-        
-        .new-feature-category ul {
-            list-style: none;
-        }
-        
-        .new-feature-category li {
-            padding: 8px 0;
-            padding-left: 25px;
+
+        .hero-meta strong { color: var(--text); }
+
+        /* ── CONTAINER ── */
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 40px;
             position: relative;
+            z-index: 1;
         }
-        
-        .new-feature-category li::before {
-            content: "✓";
-            position: absolute;
-            left: 0;
-            color: #2ecc71;
-            font-weight: bold;
+
+        /* ── SECTION HEADERS ── */
+        .section { padding: 100px 0; }
+
+        .section-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--cyan);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            display: block;
         }
-        
-        /* Tables */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 10px;
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+        }
+
+        .section-sub {
+            color: var(--muted);
+            font-size: 1.05rem;
+            max-width: 500px;
+            margin-bottom: 56px;
+            font-weight: 300;
+        }
+
+        /* ── NEW BADGE ── */
+        .new-badge {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(0,230,118,0.12);
+            border: 1px solid rgba(0,230,118,0.3);
+            color: var(--green);
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        /* ── FEATURES GRID ── */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 16px;
             overflow: hidden;
         }
-        
-        th, td {
-            padding: 15px;
-            text-align: left;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        .feature-card {
+            background: var(--bg2);
+            padding: 32px;
+            transition: background 0.2s;
         }
-        
-        th {
-            background: rgba(46, 204, 113, 0.2);
-            color: #2ecc71;
-            font-weight: bold;
+
+        .feature-card:hover { background: var(--surface2); }
+
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            display: block;
         }
-        
-        tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+
+        .feature-card h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
         }
-        
-        /* Shortcuts */
-        .shortcuts {
-            background: rgba(155, 89, 182, 0.1);
-            border: 1px solid #9b59b6;
-            border-radius: 15px;
-            padding: 30px;
+
+        .feature-card p {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.6;
         }
-        
-        .shortcuts h2 {
-            color: #9b59b6;
-            border-color: #9b59b6;
-        }
-        
-        .shortcut-grid {
+
+        /* ── WHAT'S NEW ── */
+        .whats-new-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
         }
-        
+
+        .new-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+
+        .new-card:hover {
+            border-color: rgba(0,229,255,0.2);
+            transform: translateY(-3px);
+        }
+
+        .new-card h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--cyan);
+        }
+
+        .new-card ul { list-style: none; }
+
+        .new-card li {
+            padding: 5px 0;
+            font-size: 0.88rem;
+            color: var(--muted);
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .new-card li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--green);
+            font-size: 0.7rem;
+            top: 7px;
+        }
+
+        /* ── MODELS TABLE ── */
+        .table-wrap {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        thead tr { background: rgba(0,229,255,0.06); }
+
+        th {
+            padding: 14px 20px;
+            text-align: left;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--cyan);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 20px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--muted);
+        }
+
+        tr:last-child td { border-bottom: none; }
+
+        tbody tr:hover { background: var(--surface); }
+
+        td code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text);
+        }
+
+        .stars { color: var(--amber); letter-spacing: -1px; }
+
+        .recommended-row td { color: var(--text); }
+        .recommended-row td:first-child code { color: var(--cyan); }
+
+        .turbo-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(0,229,255,0.1);
+            border: 1px solid rgba(0,229,255,0.2);
+            color: var(--cyan);
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 4px;
+            margin-left: 6px;
+        }
+
+        /* ── SHORTCUTS ── */
+        .shortcuts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
         .shortcut {
             display: flex;
             align-items: center;
-            gap: 15px;
-            padding: 10px;
-            background: rgba(255, 255, 255, 0.03);
+            gap: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 10px;
+            padding: 16px 20px;
+            transition: border-color 0.2s;
         }
-        
+
+        .shortcut:hover { border-color: rgba(124,77,255,0.3); }
+
         .key {
-            background: #2d2d44;
-            padding: 10px 18px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-weight: bold;
-            color: #2ecc71;
-            border: 1px solid #444;
-            min-width: 60px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--purple);
+            background: rgba(124,77,255,0.1);
+            border: 1px solid rgba(124,77,255,0.25);
+            padding: 8px 14px;
+            border-radius: 6px;
+            white-space: nowrap;
+            min-width: 56px;
             text-align: center;
         }
-        
-        /* Requirements */
-        .requirements {
-            background: rgba(52, 152, 219, 0.1);
-            border: 1px solid #3498db;
-            border-radius: 15px;
-            padding: 30px;
+
+        .shortcut span:last-child {
+            color: var(--muted);
+            font-size: 0.88rem;
         }
-        
-        .requirements h2 {
-            color: #3498db;
-            border-color: #3498db;
+
+        /* ── REQUIREMENTS ── */
+        .req-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
         }
-        
-        /* Models */
-        .models {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
-            padding: 30px;
+
+        .req-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 24px;
         }
-        
-        .stars {
-            color: #f39c12;
+
+        .req-card .req-icon {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            display: block;
         }
-        
-        .recommendation {
-            background: rgba(46, 204, 113, 0.1);
-            border-left: 4px solid #2ecc71;
-            padding: 15px 20px;
-            margin-top: 20px;
-            border-radius: 0 10px 10px 0;
+
+        .req-card .req-label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 4px;
         }
-        
-        /* Troubleshooting */
-        .troubleshooting {
-            background: rgba(231, 76, 60, 0.1);
-            border: 1px solid #e74c3c;
-            border-radius: 15px;
-            padding: 30px;
+
+        .req-card .req-min {
+            font-size: 0.85rem;
+            color: var(--muted);
         }
-        
-        .troubleshooting h2 {
-            color: #e74c3c;
-            border-color: #e74c3c;
+
+        .req-card .req-rec {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-top: 2px;
         }
-        
-        .troubleshooting h3 {
-            color: #e74c3c;
+
+        /* ── TROUBLESHOOTING ── */
+        .trouble-list { display: flex; flex-direction: column; gap: 12px; }
+
+        .trouble-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
         }
-        
-        .troubleshooting ul {
-            list-style: none;
-            margin-bottom: 20px;
+
+        .trouble-q {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 24px;
+            cursor: pointer;
         }
-        
-        .troubleshooting li {
-            padding: 5px 0;
-            padding-left: 20px;
+
+        .trouble-q::before {
+            content: '?';
+            width: 24px; height: 24px;
+            background: rgba(255,82,82,0.15);
+            color: var(--red);
+            border-radius: 50%;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .trouble-q span {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .trouble-a {
+            padding: 0 24px 18px 60px;
+        }
+
+        .trouble-a li {
+            color: var(--muted);
+            font-size: 0.88rem;
+            padding: 4px 0;
+            padding-left: 16px;
             position: relative;
         }
-        
-        .troubleshooting li::before {
-            content: "→";
+
+        .trouble-a li::before {
+            content: '→';
             position: absolute;
             left: 0;
-            color: #e74c3c;
+            color: var(--cyan);
         }
-        
-        /* Donation */
-        .donation {
-            background: linear-gradient(135deg, rgba(231, 76, 60, 0.1), rgba(155, 89, 182, 0.1));
-            border: 2px solid #e74c3c;
+
+        /* ── CHANGELOG ── */
+        .changelog { display: flex; flex-direction: column; gap: 0; }
+
+        .cl-item {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 40px;
+            padding: 40px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .cl-item:last-child { border-bottom: none; }
+
+        .cl-version {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--cyan);
+        }
+
+        .cl-date {
+            font-size: 0.8rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        .cl-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+
+        .cl-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.82rem;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid;
+        }
+
+        .cl-tag.add { background: rgba(0,230,118,0.08); border-color: rgba(0,230,118,0.25); color: var(--green); }
+        .cl-tag.fix { background: rgba(255,196,0,0.08); border-color: rgba(255,196,0,0.25); color: var(--amber); }
+        .cl-tag.tech { background: rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.2); color: var(--cyan); }
+
+        /* ── DONATION ── */
+        .donation-box {
+            background: linear-gradient(135deg, rgba(0,229,255,0.05) 0%, rgba(0,230,118,0.05) 100%);
+            border: 1px solid rgba(0,229,255,0.15);
             border-radius: 20px;
-            padding: 40px;
+            padding: 64px 40px;
             text-align: center;
         }
-        
-        .donation h2 {
-            color: #e74c3c;
-            border: none;
+
+        .donation-box h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
         }
-        
-        .donation p {
-            font-size: 1.1rem;
-            margin-bottom: 20px;
+
+        .donation-box p {
+            color: var(--muted);
+            margin-bottom: 32px;
+            font-size: 1.05rem;
+            font-weight: 300;
         }
-        
-        .donation-btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-            color: #ffffff;
+
+        .btn-donate {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #003087, #009cde);
+            color: #fff;
+            padding: 16px 36px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1rem;
             text-decoration: none;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(231, 76, 60, 0.3);
+            transition: all 0.2s;
+            box-shadow: 0 0 40px rgba(0,156,222,0.2);
         }
-        
-        .donation-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(231, 76, 60, 0.4);
+
+        .btn-donate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 60px rgba(0,156,222,0.35);
         }
-        
-        /* Changelog */
-        .changelog {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
-            padding: 30px;
-        }
-        
-        .changelog-item {
-            margin-bottom: 25px;
-            padding-left: 20px;
-            border-left: 3px solid #2ecc71;
-        }
-        
-        .changelog-item h3 {
-            color: #2ecc71;
-        }
-        
-        .changelog-item ul {
-            list-style: none;
-            margin-top: 10px;
-        }
-        
-        .changelog-item li {
-            padding: 3px 0;
-            color: #a0a0a0;
-        }
-        
-        /* Footer */
+
+        /* ── FOOTER ── */
         footer {
-            text-align: center;
-            padding: 50px 0 30px 0;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            margin-top: 50px;
+            border-top: 1px solid var(--border);
+            padding: 60px 0 40px;
         }
-        
-        footer a {
-            color: #2ecc71;
-            text-decoration: none;
-            margin: 0 15px;
-            transition: color 0.3s;
+
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 48px;
         }
-        
-        footer a:hover {
-            color: #27ae60;
-        }
-        
-        .author {
-            margin-top: 30px;
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 15px;
-            display: inline-block;
-        }
-        
-        .author p {
-            margin: 5px 0;
-        }
-        
-        .author .name {
+
+        .footer-brand .brand-name {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
             font-size: 1.2rem;
-            color: #2ecc71;
-            font-weight: bold;
+            color: var(--cyan);
+            margin-bottom: 8px;
         }
-        
-        .author .location {
-            color: #888;
+
+        .footer-brand p {
+            color: var(--muted);
+            font-size: 0.88rem;
+            line-height: 1.7;
         }
-        
-        .author .project {
-            color: #f39c12;
-            font-style: italic;
+
+        .footer-col h4 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            color: var(--text);
+            margin-bottom: 16px;
+            letter-spacing: 0.04em;
         }
-        
-        /* Credits */
-        .credits {
-            margin-top: 30px;
-            color: #666;
-            font-size: 0.9rem;
+
+        .footer-col ul { list-style: none; }
+
+        .footer-col li { margin-bottom: 10px; }
+
+        .footer-col a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.88rem;
+            transition: color 0.2s;
         }
-        
-        .credits a {
-            color: #888;
+
+        .footer-col a:hover { color: var(--text); }
+
+        .footer-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            font-size: 0.82rem;
+            color: var(--muted);
+            flex-wrap: wrap;
+            gap: 12px;
         }
-        
-        /* Responsive */
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 2rem;
-            }
-            
-            .download-btn {
-                padding: 15px 30px;
-                font-size: 1.1rem;
-                display: block;
-                margin: 10px 0;
-            }
-            
-            .container {
-                padding: 20px 15px;
-            }
-            
-            table {
-                font-size: 0.85rem;
-            }
-            
-            th, td {
-                padding: 10px;
-            }
+
+        .footer-bottom a { color: var(--muted); text-decoration: none; }
+        .footer-bottom a:hover { color: var(--text); }
+
+        /* ── SCROLL REVEAL ── */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 768px) {
+            nav { padding: 14px 20px; }
+            .nav-links { display: none; }
+            .container { padding: 0 20px; }
+            .section { padding: 70px 0; }
+            .hero { padding: 100px 20px 60px; }
+            .hero-buttons { flex-direction: column; align-items: center; }
+            .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+            .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+            .cl-item { grid-template-columns: 1fr; gap: 16px; }
+            .footer-bottom { flex-direction: column; text-align: center; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header>
-            <div class="logo">🎤</div>
-            <h1>Whisper Helio</h1>
-            <span class="version">v1.3</span>
-            <p class="tagline">Dictée vocale Windows — 100% offline, 100% gratuit</p>
-            <p class="subtitle">Transformez votre voix en texte instantanément, sans connexion internet.</p>
-            <div class="badges">
-                <span class="badge badge-green">v1.3</span>
-                <span class="badge badge-blue">MIT License</span>
-                <span class="badge badge-grey">Windows 10/11</span>
-                <span class="badge badge-blue">Python 3.8+</span>
-            </div>
-        </header>
-        
-        <!-- Download -->
-        <section class="download-section">
-            <a href="https://drive.google.com/file/d/VOTRE_ID_ICI/view?usp=sharing" class="download-btn">
-                📥 Télécharger v1.3
+
+    <!-- NAV -->
+    <nav>
+        <a class="nav-logo" href="#">🎤 Whisper Hélio</a>
+        <ul class="nav-links">
+            <li><a href="#features">Fonctionnalités</a></li>
+            <li><a href="#models">Modèles</a></li>
+            <li><a href="#shortcuts">Raccourcis</a></li>
+            <li><a href="#changelog">Changelog</a></li>
+            <li><a href="https://github.com/helioman32/whisper-helio" class="nav-cta">GitHub →</a></li>
+        </ul>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+        <div class="waveform">
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div>
+        </div>
+
+        <div class="hero-tag">Nouveau — Version 1.4b</div>
+
+        <h1>Whisper<br><span>Hélio</span></h1>
+
+        <p class="hero-version">v1.4b • Windows 10/11 • GNU GPL v3</p>
+
+        <p class="hero-tagline">Dictée vocale par IA — 100% offline, 100% gratuit. Votre voix en texte, instantanément.</p>
+
+        <div class="hero-buttons">
+            <a href="https://github.com/helioman32/whisper-helio/releases/latest" class="btn-primary">
+                📥 Télécharger v1.4b
             </a>
-            <a href="https://github.com/helioman32/whisper-helio/releases" class="download-btn download-btn-secondary">
-                📦 Releases GitHub
+            <a href="https://github.com/helioman32/whisper-helio" class="btn-secondary">
+                📂 Code source
             </a>
-            <p class="download-info">
-                <strong>Windows 10/11</strong> • Version portable • <strong>2.9 Go</strong><br>
-                Aucune installation requise — Premier lancement : téléchargement modèle ~3 GB
-            </p>
-        </section>
-        
-        <!-- Features -->
-        <section>
-            <h2>✨ Fonctionnalités</h2>
-            <div class="features">
-                <div class="feature">
-                    <div class="feature-icon">🔒</div>
+        </div>
+
+        <div class="hero-meta">
+            <span>🔒 <strong>100% Offline</strong></span>
+            <span>⚡ <strong>GPU NVIDIA</strong> CUDA</span>
+            <span>🆓 <strong>Gratuit</strong> à vie</span>
+            <span>📦 <strong>~2 Go</strong> tout inclus</span>
+        </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="section" id="features">
+        <div class="container">
+            <span class="section-label reveal">Ce que vous obtenez</span>
+            <h2 class="section-title reveal">Tout ce dont vous<br>avez besoin</h2>
+            <p class="section-sub reveal">Conçu pour les professionnels qui veulent dicter sans compromettre leur confidentialité.</p>
+
+            <div class="features-grid reveal">
+                <div class="feature-card">
+                    <span class="feature-icon">🔒</span>
                     <h3>100% Offline</h3>
-                    <p>Aucune donnée envoyée sur internet. Confidentialité totale.</p>
+                    <p>Aucune donnée envoyée sur internet. Confidentialité totale. Votre voix reste sur votre machine.</p>
                 </div>
-                <div class="feature">
-                    <div class="feature-icon">⚡</div>
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
                     <h3>Ultra rapide</h3>
-                    <p>Transcription quasi-instantanée avec GPU NVIDIA (CUDA).</p>
+                    <p>Transcription quasi-instantanée via GPU NVIDIA CUDA. Modèle large-v3-turbo inclus.</p>
                 </div>
-                <div class="feature">
-                    <div class="feature-icon">🎯</div>
-                    <h3>Précision Whisper</h3>
-                    <p>Basé sur le meilleur modèle de reconnaissance vocale d'OpenAI.</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">🌍</div>
+                <div class="feature-card">
+                    <span class="feature-icon">🌍</span>
                     <h3>Multilingue</h3>
-                    <p>Français, anglais, espagnol, allemand, italien, portugais, néerlandais.</p>
+                    <p>Français, anglais, espagnol, allemand, italien, portugais, néerlandais et plus.</p>
                 </div>
-                <div class="feature">
-                    <div class="feature-icon">🎮</div>
+                <div class="feature-card">
+                    <span class="feature-icon">📝</span>
+                    <h3>Macros texte</h3>
+                    <p>Remplacez un mot par un texte long automatiquement. Gagnez du temps sur vos formules répétitives.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🚀</span>
+                    <h3>Actions vocales</h3>
+                    <p>Ouvrez Excel, Chrome ou n'importe quel programme par la voix. Mains libres totales.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">📖</span>
+                    <h3>Dictionnaire</h3>
+                    <p>Corrigez les mots que Whisper transcrit mal. Adaptez le vocabulaire à votre métier.</p>
+                </div>
+                <div class="feature-card">
+                    <span class="feature-icon">🎮</span>
                     <h3>Raccourcis flexibles</h3>
-                    <p>Clavier F9-F12 ou boutons souris gaming X1/X2.</p>
+                    <p>F9 à F12, boutons souris gaming X1/X2. Choisissez ce qui vous convient.</p>
                 </div>
-                <div class="feature">
-                    <div class="feature-icon">🎨</div>
-                    <h3>Thèmes</h3>
-                    <p>Mode sombre et mode clair pour votre confort.</p>
+                <div class="feature-card">
+                    <span class="feature-icon">🎨</span>
+                    <h3>Mode compact</h3>
+                    <p>Réduisez la fenêtre au seul VU-mètre. Discret, toujours accessible.</p>
                 </div>
-                <div class="feature">
-                    <div class="feature-icon">📍</div>
+                <div class="feature-card">
+                    <span class="feature-icon">📍</span>
                     <h3>Portable</h3>
-                    <p>Aucune installation requise. Lancez et utilisez.</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">🆓</div>
-                    <h3>Gratuit</h3>
-                    <p>Open source, sans pub, sans abonnement.</p>
+                    <p>Un seul fichier .exe. Aucune installation, aucune modification du registre Windows.</p>
                 </div>
             </div>
-        </section>
-        
-        <!-- New Features -->
-        <section class="new-features">
-            <h2>🆕 Nouveautés v1.3</h2>
-            <div class="new-features-grid">
-                <div class="new-feature-category">
-                    <h3>🎨 Interface modernisée</h3>
+        </div>
+    </section>
+
+    <!-- WHAT'S NEW -->
+    <section class="section" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">Février 2026</span>
+            <h2 class="section-title reveal">Nouveautés v1.4b <span class="new-badge">NEW</span></h2>
+            <p class="section-sub reveal">Quatre axes d'amélioration majeurs dans cette version.</p>
+
+            <div class="whats-new-grid reveal">
+                <div class="new-card">
+                    <h3>⚡ large-v3-turbo</h3>
                     <ul>
-                        <li>Splash screen au démarrage</li>
-                        <li>Boutons ronds et ovales élégants</li>
-                        <li>Animations fluides</li>
-                        <li>Meilleure cohérence visuelle</li>
+                        <li>2× plus rapide que large-v3</li>
+                        <li>Seulement ~800 MB (vs 3 GB)</li>
+                        <li>Qualité quasi identique</li>
+                        <li>Disponible dans les Paramètres</li>
                     </ul>
                 </div>
-                <div class="new-feature-category">
-                    <h3>⚡ Performance optimisée</h3>
+                <div class="new-card">
+                    <h3>🎨 Paramètres redessinés</h3>
                     <ul>
-                        <li>Transcription 40% plus rapide</li>
-                        <li>CPU réduit de 40% en idle</li>
-                        <li>Latence réduite de 250ms</li>
-                        <li>VU-mètre pré-rendu</li>
+                        <li>Sans barre Windows (overrideredirect)</li>
+                        <li>Barre de titre custom + drag</li>
+                        <li>Coins arrondis, transparence</li>
+                        <li>Style cohérent avec l'app principale</li>
                     </ul>
                 </div>
-                <div class="new-feature-category">
-                    <h3>🛡️ Stabilité améliorée</h3>
+                <div class="new-card">
+                    <h3>🌍 Interface FR corrigée</h3>
                     <ul>
-                        <li>220+ passes de vérification</li>
-                        <li>Zéro freeze, zéro crash</li>
-                        <li>Gestion mémoire optimisée</li>
-                        <li>Meilleure gestion des erreurs</li>
+                        <li>Tous les accents restaurés</li>
+                        <li>Paramètres, Périphérique, Prêt...</li>
+                        <li>Traductions FR / EN / DE complètes</li>
                     </ul>
                 </div>
-                <div class="new-feature-category">
-                    <h3>🖱️ Compatibilité</h3>
+                <div class="new-card">
+                    <h3>🛡️ Stabilité</h3>
                     <ul>
-                        <li>Support souris gaming X1/X2</li>
-                        <li>Support DPI haute résolution (4K)</li>
-                        <li>Multi-moniteurs</li>
-                        <li>Plus de gel de souris</li>
+                        <li>800+ passes de vérification</li>
+                        <li>Sauvegarde config atomique</li>
+                        <li>Fix ensure_ascii → accents OK</li>
+                        <li>Fix ButtonRelease-1 curseur</li>
                     </ul>
                 </div>
             </div>
-        </section>
-        
-        <!-- Shortcuts -->
-        <section class="shortcuts">
-            <h2>⌨️ Raccourcis</h2>
-            <div class="shortcut-grid">
+        </div>
+    </section>
+
+    <!-- MODELS -->
+    <section class="section" id="models" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">IA embarquée</span>
+            <h2 class="section-title reveal">Choisissez votre modèle</h2>
+            <p class="section-sub reveal">Du plus léger au plus précis. Le modèle est téléchargé une seule fois au premier lancement.</p>
+
+            <div class="table-wrap reveal">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Modèle</th>
+                            <th>Taille</th>
+                            <th>RAM GPU</th>
+                            <th>Précision</th>
+                            <th>Vitesse</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>tiny</code></td>
+                            <td>75 MB</td>
+                            <td>1 GB</td>
+                            <td class="stars">★★☆☆☆</td>
+                            <td class="stars">★★★★★</td>
+                        </tr>
+                        <tr>
+                            <td><code>base</code></td>
+                            <td>150 MB</td>
+                            <td>1 GB</td>
+                            <td class="stars">★★★☆☆</td>
+                            <td class="stars">★★★★☆</td>
+                        </tr>
+                        <tr>
+                            <td><code>small</code></td>
+                            <td>500 MB</td>
+                            <td>2 GB</td>
+                            <td class="stars">★★★★☆</td>
+                            <td class="stars">★★★☆☆</td>
+                        </tr>
+                        <tr>
+                            <td><code>medium</code></td>
+                            <td>1,5 GB</td>
+                            <td>5 GB</td>
+                            <td class="stars">★★★★☆</td>
+                            <td class="stars">★★☆☆☆</td>
+                        </tr>
+                        <tr>
+                            <td><code>large-v2</code></td>
+                            <td>3 GB</td>
+                            <td>10 GB</td>
+                            <td class="stars">★★★★★</td>
+                            <td class="stars">★☆☆☆☆</td>
+                        </tr>
+                        <tr>
+                            <td><code>large-v3</code></td>
+                            <td>3 GB</td>
+                            <td>10 GB</td>
+                            <td class="stars">★★★★★</td>
+                            <td class="stars">★☆☆☆☆</td>
+                        </tr>
+                        <tr class="recommended-row">
+                            <td>
+                                <code>large-v3-turbo</code>
+                                <span class="turbo-tag">⭐ Recommandé</span>
+                            </td>
+                            <td>800 MB</td>
+                            <td>6 GB</td>
+                            <td class="stars">★★★★★</td>
+                            <td class="stars">★★★☆☆</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SHORTCUTS -->
+    <section class="section" id="shortcuts" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">Prise en main</span>
+            <h2 class="section-title reveal">Raccourcis</h2>
+            <p class="section-sub reveal">Tout configurable depuis les Paramètres.</p>
+
+            <div class="shortcuts-grid reveal">
                 <div class="shortcut">
                     <span class="key">F9</span>
                     <span>Maintenir pour dicter, relâcher pour transcrire</span>
                 </div>
                 <div class="shortcut">
-                    <span class="key">F10-F12</span>
-                    <span>Raccourcis alternatifs</span>
+                    <span class="key">F10–F12</span>
+                    <span>Raccourcis alternatifs configurables</span>
                 </div>
                 <div class="shortcut">
-                    <span class="key">X1/X2</span>
+                    <span class="key">X1 / X2</span>
                     <span>Boutons pouce souris gaming</span>
                 </div>
                 <div class="shortcut">
-                    <span class="key">🟢</span>
-                    <span>Mode réunion (enregistrement continu)</span>
+                    <span class="key">⏺ Vert</span>
+                    <span>Mode réunion — enregistrement continu</span>
                 </div>
                 <div class="shortcut">
                     <span class="key">⚙️</span>
-                    <span>Paramètres</span>
+                    <span>Ouvrir les Paramètres</span>
                 </div>
                 <div class="shortcut">
-                    <span class="key">✕</span>
-                    <span>Fermer l'application</span>
+                    <span class="key">−</span>
+                    <span>Mode compact — VU-mètre seul</span>
                 </div>
             </div>
-        </section>
-        
-        <!-- Requirements -->
-        <section class="requirements">
-            <h2>📋 Configuration requise</h2>
-            <table>
-                <tr>
-                    <th>Composant</th>
-                    <th>Minimum</th>
-                    <th>Recommandé</th>
-                </tr>
-                <tr>
-                    <td>🖥️ Système</td>
-                    <td>Windows 10 64-bit</td>
-                    <td>Windows 11</td>
-                </tr>
-                <tr>
-                    <td>💾 RAM</td>
-                    <td>8 GB</td>
-                    <td>16 GB</td>
-                </tr>
-                <tr>
-                    <td>🎮 GPU</td>
-                    <td>-</td>
-                    <td>NVIDIA RTX (CUDA)</td>
-                </tr>
-                <tr>
-                    <td>💿 Stockage</td>
-                    <td>5 GB</td>
-                    <td>10 GB</td>
-                </tr>
-                <tr>
-                    <td>🐍 Python</td>
-                    <td>3.8+</td>
-                    <td>3.11+</td>
-                </tr>
-            </table>
-        </section>
-        
-        <!-- Models -->
-        <section class="models">
-            <h2>🔧 Modèles Whisper</h2>
-            <table>
-                <tr>
-                    <th>Modèle</th>
-                    <th>Taille</th>
-                    <th>RAM GPU</th>
-                    <th>Précision</th>
-                    <th>Vitesse</th>
-                </tr>
-                <tr>
-                    <td><code>tiny</code></td>
-                    <td>75 MB</td>
-                    <td>1 GB</td>
-                    <td class="stars">★★☆☆☆</td>
-                    <td class="stars">★★★★★</td>
-                </tr>
-                <tr>
-                    <td><code>base</code></td>
-                    <td>150 MB</td>
-                    <td>1 GB</td>
-                    <td class="stars">★★★☆☆</td>
-                    <td class="stars">★★★★☆</td>
-                </tr>
-                <tr>
-                    <td><code>small</code></td>
-                    <td>500 MB</td>
-                    <td>2 GB</td>
-                    <td class="stars">★★★★☆</td>
-                    <td class="stars">★★★☆☆</td>
-                </tr>
-                <tr>
-                    <td><code>medium</code></td>
-                    <td>1.5 GB</td>
-                    <td>5 GB</td>
-                    <td class="stars">★★★★☆</td>
-                    <td class="stars">★★☆☆☆</td>
-                </tr>
-                <tr>
-                    <td><code>large-v3</code></td>
-                    <td>3 GB</td>
-                    <td>10 GB</td>
-                    <td class="stars">★★★★★</td>
-                    <td class="stars">★☆☆☆☆</td>
-                </tr>
-            </table>
-            <div class="recommendation">
-                <strong>💡 Recommandation :</strong><br>
-                • <strong>Avec GPU NVIDIA :</strong> <code>large-v3</code> pour la meilleure précision<br>
-                • <strong>Sans GPU :</strong> <code>small</code> ou <code>base</code> pour un bon compromis
+        </div>
+    </section>
+
+    <!-- REQUIREMENTS -->
+    <section class="section" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">Compatibilité</span>
+            <h2 class="section-title reveal">Configuration requise</h2>
+            <p class="section-sub reveal">Fonctionne sur tout Windows 10/11. Le GPU est un plus, pas une obligation.</p>
+
+            <div class="req-grid reveal">
+                <div class="req-card">
+                    <span class="req-icon">🖥️</span>
+                    <div class="req-label">Système</div>
+                    <div class="req-min">Min : Windows 10 64-bit</div>
+                    <div class="req-rec">Windows 11</div>
+                </div>
+                <div class="req-card">
+                    <span class="req-icon">💾</span>
+                    <div class="req-label">RAM</div>
+                    <div class="req-min">Min : 8 GB</div>
+                    <div class="req-rec">16 GB</div>
+                </div>
+                <div class="req-card">
+                    <span class="req-icon">🎮</span>
+                    <div class="req-label">GPU</div>
+                    <div class="req-min">Min : CPU (sans GPU)</div>
+                    <div class="req-rec">NVIDIA RTX CUDA</div>
+                </div>
+                <div class="req-card">
+                    <span class="req-icon">💿</span>
+                    <div class="req-label">Stockage</div>
+                    <div class="req-min">Min : 5 GB</div>
+                    <div class="req-rec">10 GB</div>
+                </div>
+                <div class="req-card">
+                    <span class="req-icon">🎤</span>
+                    <div class="req-label">Microphone</div>
+                    <div class="req-min">Min : Tout micro</div>
+                    <div class="req-rec">Micro USB dédié</div>
+                </div>
             </div>
-        </section>
-        
-        <!-- Troubleshooting -->
-        <section class="troubleshooting">
-            <h2>🛠️ Dépannage</h2>
-            
-            <h3>"Aucun microphone détecté"</h3>
-            <ul>
-                <li>Vérifiez que votre micro est branché</li>
-                <li>Vérifiez les paramètres son de Windows</li>
-                <li>Redémarrez l'application</li>
-            </ul>
-            
-            <h3>"Erreur chargement modèle"</h3>
-            <ul>
-                <li>Vérifiez votre connexion internet (premier lancement)</li>
-                <li>L'app utilisera automatiquement un modèle plus léger</li>
-            </ul>
-            
-            <h3>Transcription lente</h3>
-            <ul>
-                <li>Passez à un modèle plus petit (small, base, tiny)</li>
-                <li>Vérifiez que CUDA est installé si vous avez un GPU NVIDIA</li>
-            </ul>
-            
-            <h3>F9 ne fonctionne pas</h3>
-            <ul>
-                <li>Lancez en mode Administrateur</li>
-                <li>Vérifiez le raccourci dans les paramètres</li>
-                <li>Testez avec F10, F11 ou F12</li>
-            </ul>
-        </section>
-        
-        <!-- Changelog -->
-        <section class="changelog">
-            <h2>📄 Changelog</h2>
-            
-            <div class="changelog-item">
-                <h3>v1.3 — Février 2026</h3>
-                <ul>
-                    <li>Splash screen au démarrage</li>
-                    <li>Interface modernisée (boutons ronds)</li>
-                    <li>Performance +40% transcription</li>
-                    <li>CPU -40% en idle</li>
-                    <li>220+ passes de vérification</li>
-                    <li>Support DPI haute résolution</li>
-                    <li>Corrections bugs critiques</li>
-                </ul>
+        </div>
+    </section>
+
+    <!-- TROUBLESHOOTING -->
+    <section class="section" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">Support</span>
+            <h2 class="section-title reveal">Dépannage</h2>
+            <p class="section-sub reveal">Les problèmes les plus courants et leurs solutions.</p>
+
+            <div class="trouble-list reveal">
+                <div class="trouble-item">
+                    <div class="trouble-q"><span>Aucun microphone détecté</span></div>
+                    <ul class="trouble-a">
+                        <li>Vérifier que le micro est branché et sélectionné dans Windows</li>
+                        <li>Redémarrer Whisper Hélio</li>
+                    </ul>
+                </div>
+                <div class="trouble-item">
+                    <div class="trouble-q"><span>F9 ne répond pas</span></div>
+                    <ul class="trouble-a">
+                        <li>Lancer WhisperHelio.exe en tant qu'Administrateur</li>
+                        <li>Changer le raccourci dans les Paramètres (F10, F11, F12)</li>
+                    </ul>
+                </div>
+                <div class="trouble-item">
+                    <div class="trouble-q"><span>Transcription lente</span></div>
+                    <ul class="trouble-a">
+                        <li>Passer au modèle large-v3-turbo dans les Paramètres</li>
+                        <li>Vérifier que CUDA est bien détecté (Périphérique → auto)</li>
+                    </ul>
+                </div>
+                <div class="trouble-item">
+                    <div class="trouble-q"><span>Antivirus bloque le .exe</span></div>
+                    <ul class="trouble-a">
+                        <li>Faux positif dû à la compilation Nuitka — code source vérifiable sur GitHub</li>
+                        <li>Ajouter WhisperHelio.exe en exclusion antivirus</li>
+                    </ul>
+                </div>
+                <div class="trouble-item">
+                    <div class="trouble-q"><span>Fenêtre invisible au démarrage</span></div>
+                    <ul class="trouble-a">
+                        <li>Supprimer %USERPROFILE%\whisper_helio_config.json</li>
+                        <li>Relancer l'application — la fenêtre revient en position par défaut</li>
+                    </ul>
+                </div>
             </div>
-            
-            <div class="changelog-item">
-                <h3>v1.2 — 2025</h3>
-                <ul>
-                    <li>Mode réunion</li>
-                    <li>Support souris gaming X1/X2</li>
-                    <li>Thème clair/sombre</li>
-                    <li>Multi-langue interface</li>
-                </ul>
+        </div>
+    </section>
+
+    <!-- CHANGELOG -->
+    <section class="section" id="changelog" style="padding-top:0">
+        <div class="container">
+            <span class="section-label reveal">Historique</span>
+            <h2 class="section-title reveal">Changelog</h2>
+
+            <div class="changelog reveal">
+                <div class="cl-item">
+                    <div>
+                        <div class="cl-version">v1.4b</div>
+                        <div class="cl-date">Février 2026</div>
+                    </div>
+                    <div class="cl-tags">
+                        <span class="cl-tag add">+ large-v3-turbo</span>
+                        <span class="cl-tag add">+ Fenêtre Paramètres redessinée</span>
+                        <span class="cl-tag add">+ Interface FR complète</span>
+                        <span class="cl-tag fix">~ Fix ensure_ascii accents</span>
+                        <span class="cl-tag fix">~ Fix ButtonRelease-1</span>
+                        <span class="cl-tag fix">~ Sauvegarde config atomique</span>
+                        <span class="cl-tag tech">* 800+ passes de vérification</span>
+                        <span class="cl-tag tech">* Compilation Nuitka 4.0+</span>
+                    </div>
+                </div>
+                <div class="cl-item">
+                    <div>
+                        <div class="cl-version">v1.3</div>
+                        <div class="cl-date">Février 2026</div>
+                    </div>
+                    <div class="cl-tags">
+                        <span class="cl-tag add">+ Interface modernisée</span>
+                        <span class="cl-tag add">+ Support DPI 4K</span>
+                        <span class="cl-tag tech">* +40% vitesse transcription</span>
+                        <span class="cl-tag tech">* -40% CPU en idle</span>
+                        <span class="cl-tag fix">~ 220+ passes de vérification</span>
+                    </div>
+                </div>
+                <div class="cl-item">
+                    <div>
+                        <div class="cl-version">v1.2</div>
+                        <div class="cl-date">2025</div>
+                    </div>
+                    <div class="cl-tags">
+                        <span class="cl-tag add">+ Mode réunion</span>
+                        <span class="cl-tag add">+ Actions vocales</span>
+                        <span class="cl-tag add">+ Macros texte</span>
+                        <span class="cl-tag add">+ Dictionnaire</span>
+                        <span class="cl-tag add">+ Souris gaming X1/X2</span>
+                        <span class="cl-tag add">+ Thème clair/sombre</span>
+                        <span class="cl-tag add">+ Interface FR/EN/DE</span>
+                    </div>
+                </div>
+                <div class="cl-item">
+                    <div>
+                        <div class="cl-version">v1.0</div>
+                        <div class="cl-date">2024</div>
+                    </div>
+                    <div class="cl-tags">
+                        <span class="cl-tag add">+ Version initiale</span>
+                        <span class="cl-tag add">+ Dictée F9</span>
+                        <span class="cl-tag add">+ GPU CUDA</span>
+                        <span class="cl-tag add">+ VU-mètre temps réel</span>
+                    </div>
+                </div>
             </div>
-            
-            <div class="changelog-item">
-                <h3>v1.0 — 2024</h3>
-                <ul>
-                    <li>Version initiale</li>
-                </ul>
+        </div>
+    </section>
+
+    <!-- DONATION -->
+    <section class="section" style="padding-top:0">
+        <div class="container">
+            <div class="donation-box reveal">
+                <h2>❤️ Soutenir le projet</h2>
+                <p>Whisper Hélio est gratuit et le restera.<br>Si vous l'appréciez, un don aide à consacrer plus de temps à son développement.</p>
+                <a href="https://www.paypal.com/paypalme/heliostmalo" class="btn-donate">
+                    💙 Faire un don via PayPal
+                </a>
             </div>
-        </section>
-        
-        <!-- Donation -->
-        <section class="donation">
-            <h2>❤️ Soutenir le projet</h2>
-            <p>
-                Whisper Helio est <strong>gratuit</strong> et le restera.<br>
-                Si vous l'appréciez, vous pouvez soutenir son développement :
-            </p>
-            <a href="https://www.paypal.com/paypalme/heliostmalo" class="donation-btn">
-                💝 Faire un don via PayPal
-            </a>
-        </section>
-        
-        <!-- Footer -->
-        <footer>
-            <a href="https://github.com/helioman32/whisper-helio">📂 GitHub</a>
-            <a href="https://github.com/helioman32/whisper-helio/releases">📦 Releases</a>
-            <a href="https://www.paypal.com/paypalme/heliostmalo">❤️ Soutenir</a>
-            
-            <div class="author">
-                <p class="name">Créé avec ❤️ par Hélio</p>
-                <p class="location">Bretagne, France</p>
-                <p class="project">Projet Canada 2028</p>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <div class="brand-name">🎤 Whisper Hélio</div>
+                    <p>Dictée vocale par IA pour Windows.<br>100% offline, 100% gratuit, open source.<br><br>
+                    © 2026 Helio DO LIVRAMENTO ABREU<br>
+                    <a href="mailto:heliostmalo@gmail.com" style="color:var(--cyan);text-decoration:none">heliostmalo@gmail.com</a></p>
+                </div>
+                <div class="footer-col">
+                    <h4>Téléchargement</h4>
+                    <ul>
+                        <li><a href="https://github.com/helioman32/whisper-helio/releases/latest">Dernière version</a></li>
+                        <li><a href="https://github.com/helioman32/whisper-helio/releases">Toutes les releases</a></li>
+                        <li><a href="https://github.com/helioman32/whisper-helio">Code source</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Liens</h4>
+                    <ul>
+                        <li><a href="https://github.com/helioman32/whisper-helio/issues">Signaler un bug</a></li>
+                        <li><a href="https://github.com/openai/whisper">OpenAI Whisper</a></li>
+                        <li><a href="https://github.com/SYSTRAN/faster-whisper">Faster-Whisper</a></li>
+                        <li><a href="https://www.paypal.com/paypalme/heliostmalo">❤️ Soutenir</a></li>
+                    </ul>
+                </div>
             </div>
-            
-            <div class="credits">
-                <p>Licence MIT — 2024-2026</p>
-                <p>
-                    Basé sur <a href="https://github.com/openai/whisper">OpenAI Whisper</a> 
-                    et <a href="https://github.com/guillaumekln/faster-whisper">faster-whisper</a>
-                </p>
+            <div class="footer-bottom">
+                <span>Whisper Hélio v1.4b — Licence <a href="https://www.gnu.org/licenses/gpl-3.0.fr.html">GNU GPL v3</a> — Projet Canada 2028 🍁</span>
+                <span>Basé sur <a href="https://github.com/openai/whisper">OpenAI Whisper</a> & <a href="https://github.com/SYSTRAN/faster-whisper">Faster-Whisper</a></span>
             </div>
-        </footer>
-    </div>
+        </div>
+    </footer>
+
+    <script>
+        // Scroll reveal
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
 </body>
 </html>
