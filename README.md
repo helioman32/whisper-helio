@@ -8,10 +8,6 @@
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
 
 <p align="center">
-  <img src="whisper_helio_icon.png" alt="Whisper Helio" width="128">
-</p>
-
-<p align="center">
   <strong>Transformez votre voix en texte instantanément, sans connexion internet.</strong>
 </p>
 
