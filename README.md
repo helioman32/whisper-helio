@@ -2,7 +2,7 @@
 
 **Dictée vocale Windows — 100% offline, 100% gratuit**
 
-[![Version](https://img.shields.io/badge/version-1.4b-green.svg)](https://helioman.fr)
+![Version](https://img.shields.io/badge/version-1.4b-green.svg)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)]()
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
