@@ -338,18 +338,6 @@ Whisper Hélio v1.4b
 
 ---
 
-## 🤝 Contribution
-
-Les contributions sont les bienvenues !
-
-1. Fork le projet
-2. Créez une branche (`git checkout -b feature/amelioration`)
-3. Committez (`git commit -m 'Ajout fonctionnalité'`)
-4. Push (`git push origin feature/amelioration`)
-5. Ouvrez une Pull Request
-
----
-
 ## 📄 Changelog
 
 ### v1.4b (Mars 2026)
