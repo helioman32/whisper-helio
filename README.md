@@ -2,7 +2,7 @@
 
 **Dictée vocale Windows — 100% offline, 100% gratuit**
 
-[![Version](https://img.shields.io/badge/version-1.4b-green.svg)](https://github.com/helioman32/whisper-helio/releases)
+[![Version](https://img.shields.io/badge/version-1.4b-green.svg)](https://helioman.fr)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)]()
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
@@ -16,8 +16,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/helioman32/whisper-helio/releases/latest">📥 Télécharger</a> •
-  <a href="https://helioman32.github.io/whisper-helio/">🌐 Site Web</a> •
+  <a href="https://helioman.fr">📥 Télécharger</a> •
+  <a href="https://helioman.fr">🌐 Site Web</a> •
   <a href="https://www.paypal.com/paypalme/heliostmalo">❤️ Soutenir</a>
 </p>
 
@@ -114,7 +114,7 @@
 
 ### Option 1 : Exécutable (recommandé)
 
-1. Téléchargez la [dernière release](https://github.com/helioman32/whisper-helio/releases/latest)
+1. Téléchargez la [dernière version](https://helioman.fr)
 2. Extrayez le ZIP dans un dossier
 3. Lancez `installer.bat` (détecte/installe CUDA automatiquement)
 4. Ou lancez directement `WhisperHelio.exe`
