@@ -313,6 +313,39 @@ threading.Thread(target=create_desktop_shortcut, daemon=True).start()
 from i18n.translations import TRANSLATIONS, tr, set_lang_provider, clear_cache as _clear_tr_cache
 set_lang_provider(lambda: config["ui_lang"])
 
+# ── UI modules (late-binding -- fonctions utilisent ui.* au runtime) ───
+import ui
+import ui.winapi  # -> ctypes argtypes/restypes + sets ui._u32
+
+from ui.winapi import (
+    get_root_hwnd as _get_root_hwnd,
+    capture_target_window as _capture_target_window,
+    restore_target_focus as _restore_target_focus,
+    destroy_icons as _destroy_icons,
+    get_edge, CURSOR_MAP, BORDER,
+    GWL_EXSTYLE as _GWL_EXSTYLE,
+    WS_EX_APPWINDOW as _WS_EX_APPWINDOW,
+    WS_EX_TOOLWINDOW as _WS_EX_TOOLWINDOW,
+    WS_EX_NOACTIVATE as _WS_EX_NOACTIVATE,
+    invalidate_hwnd_cache as _invalidate_hwnd_cache,
+)
+from ui.helpers import (
+    _draw_pill, _create_pill_button,
+    _finalize_toplevel, _bind_toplevel_drag,
+    _apply_rounded_toplevel, _bind_rounded_toplevel,
+    _make_scroll_area,
+)
+from ui.dialogs import open_help
+
+# -- Phase 1 ui.init() -- references disponibles immediatement ---------
+ui.init(
+    root=root, config=config, theme=theme, tr=tr,
+    log_error=log_error, save_config=save_config,
+    fit_window=fit_window, _SCALE=_SCALE,
+    _clear_tr_cache=_clear_tr_cache,
+    _current_theme=_current_theme,
+)
+
 
 # ── Tooltips légers ──────────────────────────────────────────────────────
 _tooltip_win = [None]   # fenêtre tooltip active (Toplevel ou None)
@@ -502,172 +535,13 @@ root.configure(bg=theme()["bg"])
 #                   → root disparaît à nouveau de la taskbar
 # Avantage : zéro fenêtre proxy, zéro doublon, comportement prévisible.
 # ──────────────────────────────────────────────────────────────────────────
-_u32      = ctypes.windll.user32
-_ICO_PATH = str(BASE_DIR / "whisper_helio.ico")   # pathlib → str pour WinAPI
-
-# Argtypes SendMessageW — LPARAM est 64 bits, sans ça ctypes tronque les HICON
-_u32.SendMessageW.argtypes = [ctypes.wintypes.HWND, ctypes.c_uint,
-                              ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM]
-_u32.SendMessageW.restype  = ctypes.wintypes.LPARAM
-
-# Argtypes LoadImageW — HANDLE est 64 bits, sans restype ctypes tronque le HICON
-_u32.LoadImageW.argtypes = [ctypes.wintypes.HINSTANCE, ctypes.wintypes.LPCWSTR,
-                            ctypes.c_uint, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
-_u32.LoadImageW.restype  = ctypes.wintypes.HANDLE
-
-# Argtypes WinAPI — tous les HWND/HRGN/HICON sont 64 bits, ctypes tronque sans ça
-_u32.GetParent.argtypes            = [ctypes.wintypes.HWND]
-_u32.GetParent.restype             = ctypes.wintypes.HWND
-_u32.GetForegroundWindow.argtypes  = []
-_u32.GetForegroundWindow.restype   = ctypes.wintypes.HWND
-_u32.IsWindow.argtypes             = [ctypes.wintypes.HWND]
-_u32.IsWindow.restype              = ctypes.wintypes.BOOL
-_u32.SetForegroundWindow.argtypes  = [ctypes.wintypes.HWND]
-_u32.SetForegroundWindow.restype   = ctypes.wintypes.BOOL
-_u32.BringWindowToTop.argtypes     = [ctypes.wintypes.HWND]
-_u32.BringWindowToTop.restype      = ctypes.wintypes.BOOL
-_u32.AttachThreadInput.argtypes    = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD, ctypes.wintypes.BOOL]
-_u32.AttachThreadInput.restype     = ctypes.wintypes.BOOL
-_u32.GetWindowThreadProcessId.argtypes = [ctypes.wintypes.HWND, ctypes.POINTER(ctypes.wintypes.DWORD)]
-_u32.GetWindowThreadProcessId.restype  = ctypes.wintypes.DWORD
-_u32.GetWindowLongPtrW.argtypes    = [ctypes.wintypes.HWND, ctypes.c_int]
-_u32.GetWindowLongPtrW.restype     = ctypes.c_ssize_t
-_u32.SetWindowLongPtrW.argtypes    = [ctypes.wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
-_u32.SetWindowLongPtrW.restype     = ctypes.c_ssize_t
-_u32.DestroyIcon.argtypes          = [ctypes.wintypes.HICON]
-_u32.DestroyIcon.restype           = ctypes.wintypes.BOOL
-_u32.SetWindowRgn.argtypes         = [ctypes.wintypes.HWND, ctypes.c_void_p, ctypes.wintypes.BOOL]
-_u32.SetWindowRgn.restype          = ctypes.c_int
-ctypes.windll.gdi32.CreateRoundRectRgn.argtypes = [ctypes.c_int] * 6
-ctypes.windll.gdi32.CreateRoundRectRgn.restype  = ctypes.c_void_p
-ctypes.windll.gdi32.DeleteObject.argtypes       = [ctypes.c_void_p]
-ctypes.windll.gdi32.DeleteObject.restype        = ctypes.wintypes.BOOL
-
-
-# Constantes WinAPI
-_GWL_EXSTYLE      = -20
-_WS_EX_APPWINDOW  = 0x00040000
-_WS_EX_TOOLWINDOW = 0x00000080
-_WS_EX_NOACTIVATE = 0x08000000
-_WM_SETICON       = 0x0080
-_ICON_SMALL       = 0
-_ICON_BIG         = 1
-_IMAGE_ICON       = 1
-_LR_LOADFROMFILE  = 0x00000010
-
-# Cache HICON — chargés une seule fois pour éviter les fuites GDI
-_cached_hicon_big   = [None]
-_cached_hicon_small = [None]
-
-_minimized  = [False]
-_minimizing = [False]   # True pendant la séquence minimize → bloque <Map>
-_saved_geom = [None]
-_root_hwnd  = [None]   # HWND de root, mis en cache au premier accès
-
-def _get_root_hwnd():
-    """Retourne le HWND du cadre Windows de root (le vrai, visible en taskbar).
-    Utilise wm_frame() en priorité — c'est le handle du cadre WM, celui que
-    Windows utilise pour la taskbar. GetParent(winfo_id()) donne le HWND
-    interne Tkinter qui n'est pas le même.
-    """
-    if not _root_hwnd[0]:
-        try:
-            frame = root.wm_frame()
-            if frame and frame not in ("0x0", "0"):
-                _root_hwnd[0] = int(frame, 16)
-        except Exception:
-            pass
-        if not _root_hwnd[0]:
-            try:
-                _root_hwnd[0] = _u32.GetParent(root.winfo_id())
-            except Exception:
-                pass
-    return _root_hwnd[0]
-
-# ── Gestion du focus pour le collage post-transcription ──────────────────
-_target_hwnd = [0]   # HWND de la fenêtre cible (capturé au déclenchement)
-
-def _capture_target_window():
-    """Mémorise la fenêtre active au moment du déclenchement du hotkey.
-    Appelé depuis chargement() (thread BG) — utilise uniquement WinAPI,
-    jamais Tkinter. _root_hwnd[0] est pré-caché depuis le thread principal.
-    Si la fenêtre active est Whisper lui-même, on garde la cible précédente
-    (évite de perdre la cible quand le texte s'allonge et Whisper prend le focus).
-    """
-    try:
-        hwnd = _u32.GetForegroundWindow()
-        root_hwnd = _root_hwnd[0]
-        if hwnd and root_hwnd and hwnd != root_hwnd:
-            _target_hwnd[0] = hwnd
-        # else : garder _target_hwnd[0] précédent (Whisper est au premier plan)
-    except Exception:
-        pass  # garder la cible précédente en cas d'erreur
-
-def _restore_target_focus():
-    """Remet le focus sur la fenêtre cible avant le collage.
-    Utilise AttachThreadInput() pour contourner la restriction Windows qui
-    bloque SetForegroundWindow() après ~200ms sans interaction utilisateur.
-    Retourne True si le focus a été restauré.
-    """
-    target = _target_hwnd[0]
-    if not target:
-        return False
-    try:
-        if not _u32.IsWindow(target):
-            _target_hwnd[0] = 0
-            return False
-        fg_hwnd = _u32.GetForegroundWindow()
-        if fg_hwnd == target:
-            return True
-        fg_tid  = _u32.GetWindowThreadProcessId(fg_hwnd, None)
-        our_tid = ctypes.windll.kernel32.GetCurrentThreadId()
-        attached = (fg_tid != 0 and fg_tid != our_tid)
-        if attached:
-            _u32.AttachThreadInput(our_tid, fg_tid, True)
-        try:
-            _u32.SetForegroundWindow(target)
-            _u32.BringWindowToTop(target)
-        finally:
-            # Détachement garanti même si SetForegroundWindow lève une exception
-            if attached:
-                _u32.AttachThreadInput(our_tid, fg_tid, False)
-        return True
-    except Exception:
-        return False
+_u32 = ui._u32  # alias local (utilise dans minimize/restore/on_close)
+_ICO_PATH = str(BASE_DIR / "whisper_helio.ico")   # pathlib -> str pour WinAPI
 
 def _apply_icon_to_hwnd(hwnd):
-    """Applique whisper_helio.ico via toutes les méthodes disponibles.
-    
-    Triple méthode pour couvrir tous les cas Windows :
-    1. root.iconbitmap()  → Tkinter met à jour son registre interne
-    2. WM_SETICON SMALL   → icône 16px dans la barre de titre / taskbar
-    3. WM_SETICON BIG     → icône 32px dans Alt+Tab
-    """
-    if not os.path.exists(_ICO_PATH):
-        return
+    """Applique whisper_helio.ico via triple methode (-> ui.winapi)."""
+    ui.winapi.apply_icon_to_hwnd(hwnd, _ICO_PATH)
 
-    # Méthode 1 : Tkinter natif (le plus fiable pour la taskbar Windows)
-    try:
-        root.iconbitmap(_ICO_PATH)
-    except Exception:
-        pass
-
-    # Méthode 2+3 : WM_SETICON sur le HWND du cadre (renforce la méthode 1)
-    if hwnd:
-        try:
-            # Charger une seule fois — évite les fuites GDI à chaque cycle
-            if _cached_hicon_big[0] is None:
-                _cached_hicon_big[0] = _u32.LoadImageW(
-                    None, _ICO_PATH, _IMAGE_ICON, 32, 32, _LR_LOADFROMFILE)
-            if _cached_hicon_small[0] is None:
-                _cached_hicon_small[0] = _u32.LoadImageW(
-                    None, _ICO_PATH, _IMAGE_ICON, 16, 16, _LR_LOADFROMFILE)
-            if _cached_hicon_big[0]:
-                _u32.SendMessageW(hwnd, _WM_SETICON, _ICON_BIG, _cached_hicon_big[0])
-            if _cached_hicon_small[0]:
-                _u32.SendMessageW(hwnd, _WM_SETICON, _ICON_SMALL, _cached_hicon_small[0])
-        except Exception as e:
-            log_error(e, "WM_SETICON taskbar")
 
 def minimize_to_taskbar():
     """Minimise root dans la taskbar.
@@ -821,6 +695,16 @@ _settings_window = [None]
 _macros_window = [None]
 _file_transcribe_window = [None]   # Toplevel résultats transcription fichier
 _help_window = [None]              # Toplevel aide/README
+
+# -- Phase 2 ui.init() -- refs fenetres et etat -------------------------
+ui.init(
+    _app_closing=_app_closing,
+    _help_window=_help_window,
+    _settings_window=_settings_window,
+    _macros_window=_macros_window,
+    _file_transcribe_window=_file_transcribe_window,
+)
+
 _file_transcribing = threading.Lock()  # verrou anti-doublon transcription fichier (atomique)
 
 # Derniers segments de transcription fichier (pour export)
@@ -877,8 +761,7 @@ def on_close():
     for closer in (
         lambda: stream[0] and stream[0].abort(),
         lambda: stream[0] and stream[0].close(),
-        lambda: _cached_hicon_big[0] and _u32.DestroyIcon(_cached_hicon_big[0]),
-        lambda: _cached_hicon_small[0] and _u32.DestroyIcon(_cached_hicon_small[0]),
+        lambda: _destroy_icons(),  # libere HICON caches (ui.winapi)
         lambda: _lock_socket.close(),
     ):
         try:
@@ -911,32 +794,8 @@ root.protocol("WM_DELETE_WINDOW", on_close)
 
 # ── Coins arrondis + NoActivate ───────────────────────────────────────────
 def apply_rounded(event=None):
-    """Applique les coins arrondis à la fenêtre.
-    WS_EX_TOOLWINDOW : exclut root de la taskbar et Alt+Tab (état normal).
-    WS_EX_NOACTIVATE : empêche root de prendre le focus au clic.
-    Note : minimize_to_taskbar() retire temporairement TOOLWINDOW et ajoute
-           APPWINDOW pour faire apparaître root dans la taskbar le temps de
-           la minimisation. restore_from_taskbar() remet TOOLWINDOW.
-    """
-    try:
-        HWND = _get_root_hwnd()
-        if not HWND:
-            return
-        ex_style = _u32.GetWindowLongPtrW(HWND, _GWL_EXSTYLE)
-        _u32.SetWindowLongPtrW(
-            HWND, _GWL_EXSTYLE,
-            (ex_style | _WS_EX_TOOLWINDOW | _WS_EX_NOACTIVATE)
-        )
-
-        # Toujours appliquer les coins arrondis (Windows 10 et 11)
-        w, h = root.winfo_width(), root.winfo_height()
-        if w > 10 and h > 10:
-            hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, w + 1, h + 1, CORNER_RADIUS * 2, CORNER_RADIUS * 2)
-            if hrgn:
-                if not _u32.SetWindowRgn(HWND, hrgn, True):
-                    ctypes.windll.gdi32.DeleteObject(hrgn)  # libérer si échec
-    except Exception as e:
-        log_error(e, "apply_rounded")
+    """Applique coins arrondis + WS_EX_TOOLWINDOW + WS_EX_NOACTIVATE (-> ui.winapi)."""
+    ui.winapi.apply_rounded(event)
 
 _rounded_job = [None]
 _last_rounded = [0]
@@ -957,13 +816,8 @@ root.after(150, apply_rounded)
 
 # ── Redimensionnement / déplacement ──────────────────────────────────────
 _resize_edge = [None]
-BORDER = 6
+# BORDER, CURSOR_MAP, get_edge -> importes de ui.winapi
 
-# Constante globale pour les curseurs
-CURSOR_MAP = {
-    "e": "size_we", "w": "size_we", "n": "size_ns", "s": "size_ns",
-    "ne": "size_ne_sw", "sw": "size_ne_sw", "nw": "size_nw_se", "se": "size_nw_se"
-}
 
 _current_cursor = [""]
 
@@ -972,19 +826,6 @@ def set_cursor(cursor):
     if cursor != _current_cursor[0]:
         root.config(cursor=cursor)
         _current_cursor[0] = cursor
-
-def get_edge(x, y, w, h):
-    """Détermine le bord de la fenêtre sous le curseur."""
-    edge = ""
-    if y < BORDER:
-        edge += "n"
-    elif y > h - BORDER:
-        edge += "s"
-    if x < BORDER:
-        edge += "w"
-    elif x > w - BORDER:
-        edge += "e"
-    return edge or None
 
 # Set pour les boutons (sera rempli après création)
 _button_canvases = set()
@@ -1315,284 +1156,9 @@ btn_fermer.bind("<Button-1>", lambda e: on_close())
 btn_fermer.bind("<Enter>",    on_fermer_enter)
 btn_fermer.bind("<Leave>",    on_fermer_leave)
 
-# ── Regex pré-compilés pour le parsing Markdown (open_help) ──────────────
-_RE_MD_LINK   = re.compile(r'\[([^\]]+)\]\([^)]+\)')
-_RE_MD_BOLD   = re.compile(r'\*\*([^*]+)\*\*')
-_RE_MD_ITALIC = re.compile(r'\*([^*]+)\*')
+# -- UI helpers (regex, pills, toplevel) -> importes de ui.helpers + ui.dialogs --
 
-# ── Helpers UI Toplevel ──────────────────────────────────────────────────
-
-def _draw_pill(canvas, w, h, color, tag, pad=2):
-    """Dessine un rectangle arrondi (pill) sur un Canvas via tag."""
-    r = h // 2
-    canvas.create_oval(pad, pad, h - pad, h - pad, fill=color, outline="", tags=tag)
-    canvas.create_oval(w - h + pad, pad, w - pad, h - pad, fill=color, outline="", tags=tag)
-    canvas.create_rectangle(r, pad, w - r, h - pad, fill=color, outline="", tags=tag)
-
-
-def _create_pill_button(
-    parent, width, height, text, color, color_hover,
-    bg=None, emoji=None, text_color="white",
-    font=PILL_FONT, emoji_font=PILL_EMOJI_FONT,
-    tag="pill", pad=2, callback=None, pack_opts=None,
-):
-    """
-    Factory pour bouton pill Canvas avec hover automatique.
-
-    Crée un bouton arrondi (pill) avec optionnellement un emoji à gauche
-    et du texte centré. Gère automatiquement les effets hover Enter/Leave.
-
-    Parameters
-    ----------
-    parent : tk widget parent
-    width, height : dimensions du bouton
-    text : texte affiché
-    color / color_hover : couleurs normal / survol
-    bg : couleur de fond du Canvas (défaut: thème courant)
-    emoji : emoji/icône affiché dans la partie gauche (optionnel)
-    text_color : couleur du texte et de l'emoji
-    font : police du texte
-    emoji_font : police de l'emoji
-    tag : préfixe pour les tags Canvas (bg_{tag}, txt_{tag})
-    pad : marge interne du pill
-    callback : fonction appelée au clic (optionnel)
-    pack_opts : dict d'options pour pack() (optionnel)
-
-    Returns
-    -------
-    tk.Canvas : le bouton (avec tags bg_{tag} et txt_{tag})
-    """
-    if bg is None:
-        bg = theme()["bg"]
-    btn = tk.Canvas(parent, width=width, height=height, bg=bg,
-                    highlightthickness=0, cursor="hand2")
-    if pack_opts:
-        btn.pack(**pack_opts)
-    else:
-        btn.pack()
-
-    bg_tag  = f"bg_{tag}"
-    txt_tag = f"txt_{tag}"
-
-    _draw_pill(btn, width, height, color, bg_tag, pad=pad)
-
-    if emoji:
-        # Emoji dans l'arrondi gauche, texte dans l'espace droit
-        btn.create_text(height // 2, height // 2, text=emoji,
-                        font=emoji_font, fill=text_color)
-        btn.create_text(height + (width - height) // 2, height // 2,
-                        text=text, fill=text_color, font=font, tags=txt_tag)
-    else:
-        # Texte centré
-        btn.create_text(width // 2, height // 2,
-                        text=text, fill=text_color, font=font, tags=txt_tag)
-
-    # Hover automatique
-    btn.bind("<Enter>", lambda e: btn.itemconfig(bg_tag, fill=color_hover))
-    btn.bind("<Leave>", lambda e: btn.itemconfig(bg_tag, fill=color))
-
-    if callback:
-        btn.bind("<Button-1>", callback)
-
-    return btn
-
-
-def _finalize_toplevel(win, desired_w, desired_h, min_w=380, min_h=300):
-    """Dimensionne, centre et applique coins arrondis à un Toplevel."""
-    win.update_idletasks()
-    sw = win.winfo_screenwidth()
-    sh = win.winfo_screenheight()
-    ww, wh = fit_window(int(desired_w * _SCALE), int(desired_h * _SCALE), sw, sh)
-    ww = max(min(ww, sw - 40), min_w)
-    wh = max(min(wh, sh - 60), min_h)
-    win.geometry(f"{ww}x{wh}+{(sw - ww) // 2}+{max(10, (sh - wh) // 2)}")
-    win.minsize(min(min_w, sw - 40), min(min_h, sh - 60))
-    _bind_rounded_toplevel(win)
-
-
-def _bind_toplevel_drag(header_frame, win):
-    """Bind le drag-to-move sur un header frame de Toplevel (Labels uniquement)."""
-    _d = {"x": 0, "y": 0}
-    def _press(e): _d["x"], _d["y"] = e.x_root, e.y_root
-    def _drag(e):
-        dx, dy = e.x_root - _d["x"], e.y_root - _d["y"]
-        _d["x"], _d["y"] = e.x_root, e.y_root
-        win.geometry(f"+{win.winfo_x() + dx}+{win.winfo_y() + dy}")
-    header_frame.bind("<ButtonPress-1>", _press)
-    header_frame.bind("<B1-Motion>", _drag)
-    for child in header_frame.winfo_children():
-        if isinstance(child, tk.Label):
-            child.bind("<ButtonPress-1>", _press)
-            child.bind("<B1-Motion>", _drag)
-
-
-
-# ── Fenêtre Aide (README) ─────────────────────────────────────────────────
-
-def open_help():
-    """Ouvre une fenêtre affichant le README.md."""
-    if _app_closing[0]:
-        return
-    # Si déjà ouverte, la ramener au premier plan
-    if _help_window[0] is not None:
-        try:
-            if _help_window[0].winfo_exists():
-                _help_window[0].lift()
-                return
-        except Exception:
-            pass
-
-    # Chercher le README.md (à côté de l'exe ou du .pyw)
-    _base = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    _readme_path = os.path.join(_base, "README.md")
-    if not os.path.isfile(_readme_path):
-        # Fallback : dossier parent (si lancé depuis un sous-dossier)
-        _readme_path = os.path.join(os.path.dirname(_base), "README.md")
-    if not os.path.isfile(_readme_path):
-        set_statut_safe(tr("help_not_found"), COLOR_ORANGE, COLOR_ORANGE)
-        return
-
-    try:
-        with open(_readme_path, "r", encoding="utf-8") as f:
-            content = f.read()
-    except Exception:
-        set_statut_safe(tr("help_not_found"), COLOR_ORANGE, COLOR_ORANGE)
-        return
-
-    t  = theme()
-    bg = t["bg"]
-    fg = t["fg"]
-    fg2 = t["fg2"]
-
-    win = tk.Toplevel(root)
-    win.title(tr("help_title"))
-    win.configure(bg=bg)
-    win.attributes("-topmost", True)
-    win.attributes("-alpha", 0.95)
-    win.overrideredirect(True)
-    win.resizable(True, True)
-
-    def on_close_help():
-        _help_window[0] = None
-        try:
-            if hasattr(win, '_rounded_job') and win._rounded_job:
-                win.after_cancel(win._rounded_job)
-            win.destroy()
-        except tk.TclError:
-            pass
-    win.protocol("WM_DELETE_WINDOW", on_close_help)
-
-    # ── Barre de titre custom (drag + ✕) ─────────────────────────────────
-    _hdr_pad = max(8, int(14 * _SCALE))
-    frame_hdr = tk.Frame(win, bg=bg)
-    frame_hdr.pack(fill="x", padx=_hdr_pad, pady=(12, 0))
-
-    _btn_cls = tk.Canvas(frame_hdr, width=32, height=32, bg=bg,
-                         highlightthickness=0, cursor="hand2")
-    _btn_cls.pack(side="right", padx=(8, 4))
-    _cls_bg  = _btn_cls.create_oval(2, 2, 30, 30, fill=COLOR_RED, outline="")
-    _btn_cls.create_text(16, 16, text="\u2715", fill=COLOR_WHITE,
-                         font=("Segoe UI", 11, "bold"))
-    _btn_cls.bind("<Enter>", lambda e: _btn_cls.itemconfig(_cls_bg, fill=COLOR_RED_DARK))
-    _btn_cls.bind("<Leave>", lambda e: _btn_cls.itemconfig(_cls_bg, fill=COLOR_RED))
-    _btn_cls.bind("<Button-1>", lambda e: on_close_help())
-
-    tk.Label(frame_hdr, text=tr("help_title"), bg=bg,
-             fg=t.get("fg_title", fg), font=("Segoe UI", 13, "bold"),
-             anchor="w").pack(side="left", fill="x", expand=True)
-
-    _bind_toplevel_drag(frame_hdr, win)
-
-    tk.Frame(win, height=1, bg=t.get("vu_color", "#22d3ee")).pack(
-        fill="x", padx=_hdr_pad, pady=(8, 0))
-
-    # ── Zone de texte scrollable ──────────────────────────────────────────
-    text_frame = tk.Frame(win, bg=bg)
-    text_frame.pack(fill="both", expand=True, padx=12, pady=(8, 4))
-
-    text_widget = tk.Text(
-        text_frame, wrap="word",
-        bg=t.get("input_bg", "#2d2d44"),
-        fg=t.get("input_fg", "white"),
-        font=("Consolas", 11),
-        insertbackground=t.get("input_fg", "white"),
-        relief="flat", bd=8,
-        selectbackground=COLOR_BLUE,
-        selectforeground=COLOR_WHITE,
-        state="normal",
-    )
-    sb = tk.Scrollbar(text_frame, orient="vertical", command=text_widget.yview)
-    text_widget.configure(yscrollcommand=sb.set)
-    sb.pack(side="right", fill="y")
-    text_widget.pack(side="left", fill="both", expand=True)
-
-    # Formater le markdown basique (titres en gras, séparateurs)
-    text_widget.tag_configure("h1", font=("Segoe UI", 15, "bold"),
-                              foreground=t.get("fg_title", COLOR_WHITE))
-    text_widget.tag_configure("h2", font=("Segoe UI", 13, "bold"),
-                              foreground=COLOR_BLUE)
-    text_widget.tag_configure("h3", font=("Segoe UI", 11, "bold"),
-                              foreground=COLOR_PURPLE)
-    text_widget.tag_configure("bold", font=("Consolas", 11, "bold"))
-    text_widget.tag_configure("sep", foreground=fg2)
-
-    # ── Filtrage du README ───────────────────────────────────────────────
-    # Le README a un en-tête décoratif GitHub (badges, HTML, images)
-    # qu'on saute entièrement. Le contenu utile commence au premier ## ou ---
-    lines = content.splitlines()
-    _start = 0
-    for i, line in enumerate(lines):
-        s = line.strip()
-        if s.startswith("## ") or (s.startswith("---") and i > 0):
-            _start = i
-            break
-
-    # Titre de l'app en H1
-    text_widget.insert("end", "Whisper Hélio v1.5\n", "h1")
-    text_widget.insert("end", "Dictée vocale Windows — 100% offline\n\n")
-
-    _skip_prefixes = ("[![", "<p", "</p>", "<a", "</a>", "<img",
-                       "<strong>", "</strong>", "![")
-
-    for line in lines[_start:]:
-        stripped = line.strip()
-        # Sauter les lignes HTML/badges résiduelles
-        if stripped.startswith(_skip_prefixes):
-            continue
-        if stripped.startswith("### "):
-            text_widget.insert("end", stripped[4:] + "\n", "h3")
-        elif stripped.startswith("## "):
-            text_widget.insert("end", "\n" + stripped[3:] + "\n", "h2")
-        elif stripped.startswith("# "):
-            text_widget.insert("end", stripped[2:] + "\n", "h1")
-        elif stripped.startswith("---") or stripped.startswith("==="):
-            text_widget.insert("end", "─" * 50 + "\n", "sep")
-        elif stripped == "":
-            text_widget.insert("end", "\n")
-        else:
-            # Nettoyer le markdown inline : **gras** → gras, [texte](url) → texte
-            clean = _RE_MD_LINK.sub(r'\1', stripped)
-            clean = _RE_MD_BOLD.sub(r'\1', clean)
-            clean = _RE_MD_ITALIC.sub(r'\1', clean)
-            text_widget.insert("end", clean + "\n")
-
-    text_widget.configure(state="disabled")  # lecture seule
-
-    # ── Bouton Fermer ─────────────────────────────────────────────────────
-    footer = tk.Frame(win, bg=bg)
-    footer.pack(fill="x", padx=12, pady=(4, 12))
-    tk.Frame(footer, height=1, bg=fg2).pack(fill="x", pady=(0, 8))
-
-    _btn_close = _create_pill_button(
-        footer, 120, PILL_H, tr("file_close").upper(),
-        COLOR_RED, COLOR_RED_DARK, bg=bg, tag="hc",
-        callback=lambda e: on_close_help(),
-    )
-
-    # Taille, centrage, coins arrondis
-    _finalize_toplevel(win, 600, 700)
-    _help_window[0] = win
-
+# -- Fenetre Aide -> ui.dialogs.open_help (importee en haut) --
 
 # ── Tooltips sur les boutons du header ────────────────────────────────────
 _tooltip_bind(btn_help,     "tooltip_help")
@@ -1612,6 +1178,9 @@ def _hotkey_label():
     if h in HOTKEY_LABELS:
         return tr(HOTKEY_LABELS[h])
     return h.upper()
+
+# -- Phase 3b: _hotkey_label -> ui --
+ui.init(_hotkey_label=_hotkey_label)
 
 mode_libre = [False]
 hotkey_changed = [False]
@@ -2031,205 +1600,43 @@ def set_texte_safe(texte):
     """Met à jour le texte de manière thread-safe."""
     _safe_after(0, lambda: None if _app_closing[0] else set_texte(texte))
 
-# ── Fenêtre Paramètres ────────────────────────────────────────────────────
+# -- Phase 3 ui.init() -- fonctions UI thread-safe ---------------------
+ui.init(
+    set_statut_safe=set_statut_safe,
+    set_texte_safe=set_texte_safe,
+    _safe_after=_safe_after,
+    apply_theme=apply_theme,
+    _hotkey_label=_hotkey_label,
+)
+
+
+# -- Fenetre Parametres (-> ui.dialogs.open_settings) ----------------------
 def open_settings():
-    """Ouvre la fenêtre des paramètres."""
-    # Empêcher l'ouverture multiple
-    if _settings_window[0] is not None:
-        try:
-            if _settings_window[0].winfo_exists():
-                _settings_window[0].lift()
-                _settings_window[0].focus_force()
-                return
-        except Exception:
-            pass
-    
-    t = theme()
-    win = tk.Toplevel(root)
-    _settings_window[0] = win
-    win.title(tr("settings") + " - Whisper Hélio")
-    win.configure(bg=t["bg"])
-    win.attributes("-topmost", True)
-    win.attributes("-alpha", 0.93)
-    win.overrideredirect(True)
-    win.resizable(True, True)
+    """Ouvre la fenetre des parametres (-> ui.dialogs.open_settings)."""
+    from ui.dialogs import open_settings as _open_settings_ui
 
-    # Gestion fermeture fenêtre
-    def on_close_settings():
-        _settings_window[0] = None
-        try:
-            if hasattr(win, '_rounded_job') and win._rounded_job:
-                win.after_cancel(win._rounded_job)
-            win.destroy()
-        except tk.TclError: pass
-    win.protocol("WM_DELETE_WINDOW", on_close_settings)
-
-    # ── Barre de titre custom (drag + bouton ✕) ──────────────────────────────
-    _title_bar = tk.Frame(win, bg=t.get("header_bg", t["bg"]), height=32)
-    _title_bar.pack(fill="x", padx=0, pady=0)
-    _title_bar.pack_propagate(False)
-    tk.Label(_title_bar, text=tr("settings") + " — Whisper Hélio",
-             bg=t.get("header_bg", t["bg"]), fg=t["fg"],
-             font=("Consolas", 16, "bold")).pack(side="left", padx=12)
-
-    # Bouton ✕ fermeture
-    _btn_cls = tk.Canvas(_title_bar, width=22, height=22,
-                         bg=t.get("header_bg", t["bg"]), highlightthickness=0, cursor="hand2")
-    _btn_cls.pack(side="right", padx=(0, 6), pady=5)
-    _cls_bg  = _btn_cls.create_oval(1, 1, 21, 21, fill=t.get("btn_icon_bg", "#2a2a3e"), outline="")
-    _cls_txt = _btn_cls.create_text(11, 11, text="✕", fill=t["btn_fg"], font=("Segoe UI", 8, "bold"))
-    def _cls_enter(e): _btn_cls.itemconfig(_cls_bg, fill=COLOR_RED_DARK); _btn_cls.itemconfig(_cls_txt, fill=COLOR_WHITE)
-    def _cls_leave(e): _btn_cls.itemconfig(_cls_bg, fill=t.get("btn_icon_bg","#2a2a3e")); _btn_cls.itemconfig(_cls_txt, fill=t["btn_fg"])
-    _btn_cls.bind("<Enter>",    _cls_enter)
-    _btn_cls.bind("<Leave>",    _cls_leave)
-    _btn_cls.bind("<Button-1>", lambda e: on_close_settings())
-
-    _bind_toplevel_drag(_title_bar, win)
-
-    # Séparateur sous la barre de titre
-    tk.Frame(win, bg=t.get("sep", "#3a3a52"), height=1).pack(fill="x")
-
-    # ── Zone scrollable pour le contenu ──────────────────────────────────────
-    _set_canvas = tk.Canvas(win, bg=t["bg"], highlightthickness=0)
-    _set_scrollbar = tk.Scrollbar(win, orient="vertical", command=_set_canvas.yview)
-    _set_inner = tk.Frame(_set_canvas, bg=t["bg"])
-
-    _set_wid = _set_canvas.create_window((0, 0), window=_set_inner, anchor="nw")
-    _set_canvas.configure(yscrollcommand=_set_scrollbar.set)
-    # Étirer le frame interne sur toute la largeur du canvas
-    def _set_resize_inner(e):
-        _set_canvas.itemconfig(_set_wid, width=e.width)
-    _set_canvas.bind("<Configure>", _set_resize_inner)
-
-    _set_canvas.pack(side="left", fill="both", expand=True)
-    # Scrollbar masquée par défaut — visible uniquement si le contenu dépasse
-    _set_sb_visible = [False]
-    def _set_check_scrollbar(e=None):
-        _set_canvas.configure(scrollregion=_set_canvas.bbox("all"))
-        need = _set_inner.winfo_reqheight() > _set_canvas.winfo_height()
-        if need and not _set_sb_visible[0]:
-            _set_scrollbar.pack(side="right", fill="y")
-            _set_sb_visible[0] = True
-        elif not need and _set_sb_visible[0]:
-            _set_scrollbar.pack_forget()
-            _set_sb_visible[0] = False
-    _set_inner.bind("<Configure>", _set_check_scrollbar)
-
-    # Molette souris pour scroller (bind sur la fenêtre — pas bind_all qui hijacke root)
-    _set_scroll_accum = [0.0]
-    def _set_mousewheel(e):
-        _set_scroll_accum[0] += -e.delta / 120.0
-        lines = int(_set_scroll_accum[0])
-        if lines:
-            _set_canvas.yview_scroll(lines, "units")
-            _set_scroll_accum[0] -= lines
-    def _bind_mw_recursive(widget):
-        widget.bind("<MouseWheel>", _set_mousewheel)
-        for child in widget.winfo_children():
-            _bind_mw_recursive(child)
-    # On bind après construction du contenu, via un after
-    def _bind_all_mw():
-        _bind_mw_recursive(win)
-    win.after(100, _bind_all_mw)
-
-    # Contenu (dans _set_inner au lieu de win)
-    tk.Label(_set_inner, text=tr("hardware", hw=hw_info), bg=t["bg"], fg=COLOR_PURPLE,
-             font=("Consolas", 14)).pack(pady=(14, 10))
-
-    _pad_x = max(10, int(30 * _SCALE))
-    frame = tk.Frame(_set_inner, bg=t["bg"])
-    frame.pack(fill="x", padx=_pad_x, pady=5)
-
-    v_theme = tk.StringVar(win, value=config["theme"])
-    v_model = tk.StringVar(win, value=config["model"])
-    v_device = tk.StringVar(win, value=config["device"])
-    v_lang = tk.StringVar(win, value=config["language"])
-    v_hotkey = tk.StringVar(win, value=config["hotkey"])
-    v_position = tk.StringVar(win, value=config["position"])
-    v_ui_lang = tk.StringVar(win, value=config["ui_lang"])
-
-    labels = [
-        (tr("theme"), v_theme, VALID_THEMES),
-        (tr("model"), v_model, VALID_MODELS),
-        (tr("device"), v_device, VALID_DEVICES),
-        (tr("lang"), v_lang, VALID_LANGUAGES),
-        (tr("shortcut"), v_hotkey, VALID_HOTKEYS),
-        (tr("position"), v_position, VALID_POSITIONS),
-        (tr("ui_lang"), v_ui_lang, VALID_UI_LANGS),
-    ]
-
-    _lbl_w = max(10, int(18 * _SCALE))
-    for label_text, var, options in labels:
-        f = tk.Frame(frame, bg=t["bg"])
-        f.pack(fill="x", pady=6)
-        tk.Label(f, text=label_text, bg=t["bg"], fg=t["fg2"],
-                 font=("Consolas", 16), width=_lbl_w, anchor="w").pack(side="left")
-        menu = tk.OptionMenu(f, var, *options)
-        _ibg, _ifg, _ihv = t.get("input_bg", "#2d2d44"), t.get("input_fg", "white"), t.get("input_hover", "#3d3d54")
-        menu.config(bg=_ibg, fg=_ifg, font=("Consolas", 16),
-                   activebackground=_ihv, activeforeground=_ifg,
-                   highlightthickness=0)
-        menu["menu"].config(bg=_ibg, fg=_ifg, font=("Consolas", 16))
-        menu.pack(side="left", fill="x", expand=True, padx=(8, 0))
-
-    # ── Option streaming temps réel ──────────────────────────────────────
-    v_streaming = tk.BooleanVar(win, value=config.get("streaming", True))
-    _sf_stream = tk.Frame(frame, bg=t["bg"])
-    _sf_stream.pack(fill="x", pady=6)
-    tk.Label(_sf_stream, text=tr("streaming_label"), bg=t["bg"], fg=t["fg2"],
-             font=("Consolas", 16), width=_lbl_w, anchor="w").pack(side="left")
-    _cb_stream = tk.Checkbutton(
-        _sf_stream, variable=v_streaming,
-        bg=t["bg"], fg=t["fg2"], selectcolor=t.get("input_bg", "#2d2d44"),
-        activebackground=t["bg"], activeforeground=t["fg2"],
-        font=("Consolas", 14), text=tr("streaming_desc"),
-    )
-    _cb_stream.pack(side="left", padx=(8, 0))
-
-    tk.Label(_set_inner, text=tr("restart_note"), bg=t["bg"], fg=COLOR_RED,
-             font=("Consolas", 14)).pack(pady=(15, 8))
-
-    _settings_vars = {
-        "theme": v_theme, "model": v_model, "device": v_device,
-        "language": v_lang, "hotkey": v_hotkey, "position": v_position,
-        "ui_lang": v_ui_lang,
-    }
-
-    def save_and_close():
-        for key, var in _settings_vars.items():
-            config[key] = var.get()
-        # Streaming (booléen séparé)
-        config["streaming"] = v_streaming.get()
+    def _on_save(new_settings, streaming_enabled):
+        """Callback : applique les settings et met a jour l'UI."""
+        for key, val in new_settings.items():
+            config[key] = val
+        config["streaming"] = streaming_enabled
         _streamer.enabled = config["streaming"]
         _streamer.set_language(config["language"])
-        # Si on vient d'activer le streaming et que le modèle n'est pas chargé → charger
         if _streamer.enabled and not _streamer.is_ready:
             _streamer.load_async()
-        _current_theme[0] = None  # Reset cache thème
-        _clear_tr_cache()           # Reset cache traductions
+        _current_theme[0] = None
+        _clear_tr_cache()
         try:
             apply_theme()
         except Exception:
-            pass  # thème invalide → on continue avec l'ancien
-        save_config(config)  # sauver APRÈS apply_theme pour éviter config corrompue
+            pass
+        save_config(config)
         title_label.config(text=tr("title"))
         donation_label.config(text=tr("support"))
         hotkey_changed[0] = True
         set_statut(tr("ready", hotkey=_hotkey_label()), COLOR_GREEN, COLOR_GREEN)
-        on_close_settings()  # annule les jobs after + ferme proprement
 
-    # ── Bouton 💾 SAUVEGARDER — rectangle arrondi bleu ──────────────────────
-    _sf = tk.Frame(_set_inner, bg=t["bg"])
-    _sf.pack(pady=(8, 20))
-    _btn_sv = _create_pill_button(
-        _sf, 200, PILL_H_LG, tr("save_button"),
-        COLOR_SAVE, COLOR_SAVE_HOVER, bg=t["bg"],
-        emoji="💾", font=PILL_FONT_LG, tag="sv",
-        callback=lambda e: save_and_close(),
-    )
-
-    # Taille, centrage, coins arrondis
-    _finalize_toplevel(win, 620, 720, min_h=400)
+    _open_settings_ui(hw_info=hw_info, streamer=_streamer, on_save=_on_save)
 
 btn_settings.bind("<Button-1>", lambda e: open_settings())
 
@@ -2983,74 +2390,13 @@ def process_and_paste(texte, delay=PASTE_DELAY):
         copy_and_paste(texte, delay=delay)
     return texte
 
+# -- Phase 4 ui.init() -- copy_and_paste --------------------------------
+ui.init(copy_and_paste=copy_and_paste)
 
 # (macros / actions / dictionnaire → core/macros.py)
 
-def _make_scroll_area(parent, bg):
-    """Crée une zone scrollable (Canvas + Scrollbar + Frame intérieur).
-    Retourne (canvas, inner_frame) — factorisation des 3 onglets identiques."""
-    fs = tk.Frame(parent, bg=bg)
-    fs.pack(fill="both", expand=True, padx=max(8, int(16 * _SCALE)), pady=4)
-    cs = tk.Canvas(fs, bg=bg, highlightthickness=0)
-    sb = tk.Scrollbar(fs, orient="vertical", command=cs.yview)
-    cs.configure(yscrollcommand=sb.set)
-    # Scrollbar masquée par défaut — visible uniquement si contenu dépasse
-    cs.pack(side="left", fill="both", expand=True)
-    inner = tk.Frame(cs, bg=bg)
-    cw = cs.create_window((0, 0), window=inner, anchor="nw")
-
-    _sb_vis = [False]
-    def _cfg(e):
-        cs.configure(scrollregion=cs.bbox("all"))
-        cs.itemconfig(cw, width=cs.winfo_width())
-        need = inner.winfo_reqheight() > cs.winfo_height()
-        if need and not _sb_vis[0]:
-            sb.pack(side="right", fill="y")
-            _sb_vis[0] = True
-        elif not need and _sb_vis[0]:
-            sb.pack_forget()
-            _sb_vis[0] = False
-    inner.bind("<Configure>", _cfg)
-    cs.bind("<Configure>", lambda e: cs.itemconfig(cw, width=e.width))
-
-    _mw_accum = [0.0]
-    def _mw(e):
-        _mw_accum[0] += -e.delta / 120.0
-        lines = int(_mw_accum[0])
-        if lines:
-            cs.yview_scroll(lines, "units")
-            _mw_accum[0] -= lines
-    cs.bind("<MouseWheel>", _mw)
-    inner.bind("<MouseWheel>", _mw)
-
-    return cs, inner, _mw
-
-def _apply_rounded_toplevel(win):
-    """Applique les coins arrondis à une fenêtre Toplevel."""
-    try:
-        if not win.winfo_exists():
-            return
-        HWND = _u32.GetParent(win.winfo_id())
-        w, h = win.winfo_width(), win.winfo_height()
-        if w > 10 and h > 10:
-            hrgn = ctypes.windll.gdi32.CreateRoundRectRgn(0, 0, w+1, h+1, 28, 28)
-            if hrgn:
-                if not _u32.SetWindowRgn(HWND, hrgn, True):
-                    ctypes.windll.gdi32.DeleteObject(hrgn)  # libérer si échec
-    except Exception as e:
-        log_error(e, "apply_rounded_toplevel")
-
-def _bind_rounded_toplevel(win):
-    """Bind <Configure> avec debounce pour coins arrondis sur un Toplevel."""
-    win._rounded_job = None   # stocké sur l'objet pour annulation dans on_close
-    def _sched(e=None):
-        if win._rounded_job:
-            try: win.after_cancel(win._rounded_job)
-            except Exception: pass
-        win._rounded_job = win.after(80, lambda: _apply_rounded_toplevel(win))
-    win.after(100, lambda: _apply_rounded_toplevel(win))
-    win.bind("<Configure>", _sched)
-
+# _make_scroll_area, _apply_rounded_toplevel, _bind_rounded_toplevel
+# -> importes de ui.helpers
 
 # ── Builders d'onglets pour open_macros() ────────────────────────────────
 
@@ -3710,7 +3056,6 @@ def _update_streaming_label_position():
     # Re-planifier tant qu'on enregistre
     if is_recording.is_set() and _streamer.enabled:
         _streaming_job[0] = root.after(50, _update_streaming_label_position)
-
 
 
 # (clavier / hotkeys → core/hotkeys.py)
