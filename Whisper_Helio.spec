@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # ══════════════════════════════════════════════════════════════════════════════
-#  Whisper Hélio v1.4 — PyInstaller .spec
+#  Whisper Hélio v1.5 — PyInstaller .spec
 #  Génère : dist/WhisperHelio.exe  (fichier unique, sans console)
 #
 #  Usage :
@@ -99,6 +99,14 @@ hiddenimports = [
     'faster_whisper.tokenizer',
     'ctranslate2',
     # Note : ctranslate2.converters retiré — inutile au runtime (conversion modèles)
+
+    # Modules internes Whisper Hélio
+    'core.streaming',
+    'core.export',
+    'core.macros',
+    'core.hotkeys',
+    'core.model',
+    'core.transcription',
 
     # Audio (extension native PortAudio)
     'sounddevice',
@@ -206,7 +214,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    upx_exclude=[],
+    upx_exclude=['ctranslate2.dll', 'cudnn64_12.dll', 'cudnn_ops64_12.dll', 'cudnn_cnn64_12.dll'],
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -224,7 +232,7 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    upx_exclude=[],
+    upx_exclude=['ctranslate2.dll', 'cudnn64_12.dll', 'cudnn_ops64_12.dll', 'cudnn_cnn64_12.dll'],
     name='WhisperHelio',          # dossier dist/WhisperHelio/
 )
 

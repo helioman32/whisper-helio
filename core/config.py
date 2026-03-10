@@ -13,7 +13,6 @@ Aucune dépendance vers le reste de l'application (module autonome).
 
 import json
 import os
-import sys
 import time
 import traceback
 import threading
@@ -46,7 +45,8 @@ DEFAULT_CONFIG = {
     "macros": [],
     "action_trigger": "action",
     "actions": [],
-    "dictionary": []
+    "dictionary": [],
+    "streaming": True,          # Aperçu temps réel (modèle tiny en parallèle)
 }
 
 
@@ -117,6 +117,10 @@ def validate_config(c):
             and d["wrong"].strip()
         ]
 
+    # Validation streaming (booléen)
+    if not isinstance(c.get("streaming"), bool):
+        c["streaming"] = DEFAULT_CONFIG["streaming"]
+
     # Validation des coordonnées fenêtre (float → int pour éviter TclError geometry)
     for key in ["win_x", "win_y"]:
         if key in c:
@@ -183,20 +187,25 @@ def _rotate_log_if_needed():
 
 
 _log_lock = threading.Lock()
+_last_rotate_check = [0.0]   # timestamp du dernier check rotation
 
 
 def log_error(e=None, msg=None):
     """Enregistre une erreur dans le fichier log (avec rotation à 5 Mo)."""
     try:
         with _log_lock:
-            _rotate_log_if_needed()
+            # Vérifier la rotation au plus toutes les 60 secondes
+            _now = time.time()
+            if _now - _last_rotate_check[0] > 60:
+                _last_rotate_check[0] = _now
+                _rotate_log_if_needed()
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 header = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] "
                 if msg:
                     f.write(header + msg + "\n")
-                elif e:
-                    f.write(header)
                 if e:
+                    if not msg:
+                        f.write(header)
                     traceback.print_exception(type(e), e, e.__traceback__, file=f)
     except (IOError, OSError):
         pass

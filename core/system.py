@@ -90,8 +90,9 @@ def create_desktop_shortcut():
         if not desktop.exists():
             return
         shortcut_path = desktop / "Whisper Hélio.lnk"
-        if shortcut_path.exists():
-            return  # raccourci déjà présent
+        shortcut_alt  = desktop / "Whisper Helio.lnk"
+        if shortcut_path.exists() or shortcut_alt.exists():
+            return  # raccourci déjà présent (avec ou sans accent)
 
         # Déterminer le chemin de l'exe (compilé) ou du script (dev)
         if getattr(sys, 'frozen', False):
@@ -124,7 +125,7 @@ def create_desktop_shortcut():
             icon_loc = f"{target},0"
 
         # Créer le raccourci via PowerShell
-        def _ps_esc(s): return str(s).replace("'", "''")
+        def _ps_esc(s): return str(s).replace("'", "''").replace("`", "``").replace("$", "`$")
         ps_script = (
             f"$ws = New-Object -ComObject WScript.Shell; "
             f"$s = $ws.CreateShortcut('{_ps_esc(shortcut_path)}'); "

@@ -1,16 +1,17 @@
 @echo off
 setlocal enabledelayedexpansion
 chcp 65001 >nul
-title Installation Whisper Helio v1.4b
+title Installation Whisper Helio v1.5
 
 echo.
 echo  ========================================================
-echo          INSTALLATION WHISPER HELIO v1.4b
+echo          INSTALLATION WHISPER HELIO v1.5
 echo  ========================================================
 echo.
 echo  Ce script va :
 echo    - Verifier et installer les pilotes CUDA - GPU NVIDIA
-echo    Le raccourci bureau sera cree au premier lancement de l'application.
+echo    - Creer un raccourci sur le bureau
+echo    - Lancer Whisper Helio
 echo.
 pause
 
@@ -216,9 +217,25 @@ echo       Le GPU sera utilise pour la transcription rapide.
 
 :skip_cuda
 
-:: ── Raccourci bureau ─────────────────────────────────────
-:: Le raccourci est cree automatiquement par l'application au premier lancement.
-:: Pas besoin de le creer ici — evite les doublons sur le bureau.
+:: ── Etape 3 : Raccourci bureau ──────────────────────────
+echo.
+echo [3/3] Creation du raccourci bureau...
+
+set "DESKTOP=%USERPROFILE%\Desktop"
+set "SHORTCUT=!DESKTOP!\Whisper Helio.lnk"
+
+if exist "!SHORTCUT!" (
+    echo       Raccourci deja present sur le bureau
+) else (
+    powershell -NoProfile -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%DESKTOP%\Whisper Helio.lnk'); $s.TargetPath = '!EXE_PATH!'; $s.WorkingDirectory = '!CURRENT_DIR!'; $s.IconLocation = '!ICO_PATH!,0'; $s.Description = 'Whisper Helio - Dictee vocale par IA'; $s.Save()"
+    if exist "!SHORTCUT!" (
+        echo       OK - Raccourci cree sur le bureau
+    ) else (
+        echo       AVERTISSEMENT : Impossible de creer le raccourci
+        echo       Vous pouvez creer un raccourci manuellement vers :
+        echo       !EXE_PATH!
+    )
+)
 
 echo.
 echo  ========================================================
@@ -245,7 +262,6 @@ echo    F9 : Maintenir pour dicter, relacher pour transcrire
 echo    Bouton vert : Mode reunion - enregistrement continu
 echo.
 echo  Lancement de Whisper Helio...
-echo  Le raccourci bureau sera cree automatiquement au premier lancement.
 echo.
 echo  NOTE : Si votre antivirus bloque l'application, autorisez-la
 echo  puis relancez depuis le raccourci sur le bureau.

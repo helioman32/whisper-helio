@@ -1,0 +1,14 @@
+dist/
+build/
+__pycache__/
+*.pyc
+*.zip
+*.bak
+*.exe
+backups/
+nul
+diagnostic_splash.pyw
+fix_defender.ps1
+test_fonctionnel.py
+.claude/
+internet/

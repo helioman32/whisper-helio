@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Désinstallation Whisper Helio v1.4b
+title Désinstallation Whisper Helio v1.5
 
 echo.
 echo  ╔══════════════════════════════════════════════════════════════╗
-echo  ║         DÉSINSTALLATION WHISPER HELIO v1.4b                  ║
+echo  ║         DÉSINSTALLATION WHISPER HELIO v1.5                  ║
 echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 echo  Ce script va supprimer :

@@ -1,15 +1,17 @@
 """
-Whisper Hélio v1.4b — Dictée vocale Windows 100% offline
+Whisper Hélio v1.5 — Dictée vocale Windows 100% offline
 Basé sur OpenAI Whisper / faster-whisper
 
 Auteur : Hélio, Bretagne (France)
 Projet Seattle (USA) 2028
 
-Nouveautés v1.4b :
-- Minimisation WinAPI : bouton − envoie l'app dans la barre des tâches Windows
-- Icône correcte au deiconify : restauration propre depuis la taskbar
-- Mode compact (VU-mètre seul) : accessible par double-clic sur le header
-- Dictionnaire avec lignes alternées : meilleure lisibilité
+Nouveautés v1.5 :
+- Export multi-format (SRT, VTT, TXT horodaté, TXT brut, JSON)
+  après transcription de fichier audio/vidéo
+- Module core/export.py avec type hints et NamedTuple Segment
+
+Historique v1.4b :
+- Minimisation WinAPI, mode compact, dictionnaire lignes alternées
 - Harmonisation UI/UX des fenêtres Macros / Actions / Dictionnaire
 """
 
@@ -22,6 +24,7 @@ import sys
 import ctypes
 import atexit
 import faulthandler
+from collections import deque
 from pathlib import Path
 
 # ── Filet segfault — capture les crashs C (ctranslate2, PortAudio) ───────
@@ -44,7 +47,7 @@ except ImportError:
 # et affiche l'icône Python dans la taskbar au lieu de whisper_helio.ico
 try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-        "HelioDL.WhisperHelio.v14b"
+        "HelioDL.WhisperHelio.v15"
     )
 except Exception:
     pass
@@ -62,10 +65,6 @@ except Exception:
 root = TkinterDnD.Tk() if _HAS_DND else tk.Tk()
 root.withdraw()   # Caché IMMÉDIATEMENT — rien n'apparaît à l'écran
 
-def _update_splash(msg, val):
-    """No-op : pas de splash, la fenêtre est cachée pendant le chargement."""
-    pass
-
 # ── Import critique — si un module manque, message clair au lieu de crash
 def _fatal_import(error):
     """Affiche une erreur fatale d'import et quitte proprement."""
@@ -77,14 +76,12 @@ def _fatal_import(error):
     sys.exit(1)
 
 # Charger les modules avec progression
-_update_splash("Chargement audio...", 15)
 try:
     import sounddevice as sd
     import numpy as np
 except ImportError as _ie:
     _fatal_import(_ie)
 
-_update_splash("Chargement clavier...", 30)
 # keyboard remplacé par GetAsyncKeyState/keybd_event (zéro hook système)
 try:
     import pyperclip
@@ -92,7 +89,6 @@ try:
 except ImportError as _ie:
     _fatal_import(_ie)
 
-_update_splash("Chargement Whisper...", 50)
 import math
 import re
 import socket
@@ -186,9 +182,8 @@ if getattr(sys, 'frozen', False):
     try:
         from core.config import LOG_FILE
         with open(LOG_FILE, "a", encoding="utf-8") as _f:
-            import time as _time_mod
             for _line in _cuda_log:
-                _f.write(f"[{_time_mod.strftime('%Y-%m-%d %H:%M:%S')}] [CUDA] {_line}\n")
+                _f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] [CUDA] {_line}\n")
     except Exception:
         pass
 
@@ -196,8 +191,6 @@ if getattr(sys, 'frozen', False):
 # WhisperModel + ctranslate2 = ~1.5s d'import → déplacé dans le thread chargement
 # L'import se fait en parallèle de l'affichage de la fenêtre.
 _HAS_BATCHED = [None]   # None = pas encore testé, True/False après 1er essai
-
-_update_splash("Modules charges!", 70)
 
 # Vérification version Python
 if sys.version_info < (3, 8):
@@ -231,6 +224,20 @@ ROUNDED_DELAY_MS = 50
 WAVE_SPEED = 0.06
 VU_DECAY = 0.82
 CORNER_RADIUS = 18
+TOOLTIP_DELAY_MS = 500
+MINIMIZE_DELAY_MS = 150
+
+# ── Dimensions boutons pill ──────────────────────────────────────────────
+PILL_H         = 34     # hauteur standard bouton pill
+PILL_H_LG      = 36     # hauteur large (boutons save)
+PILL_FONT      = ("Segoe UI", 11, "bold")
+PILL_FONT_LG   = ("Segoe UI", 14, "bold")
+PILL_EMOJI_FONT = ("Segoe UI", 10)
+
+# ── Couleurs boutons spéciaux ────────────────────────────────────────────
+COLOR_SAVE      = "#2563eb"
+COLOR_SAVE_HOVER = "#1d4ed8"
+COLOR_GREY_HOVER = "#555555"
 
 # ── Prompts initiaux pour transcription fichier (qualité max) ─────────────
 # Le prompt initial guide le modèle vers un style de transcription formel
@@ -286,6 +293,18 @@ from core.audio import (
 
 # ── Système (module externe) ───────────────────────────────────────────────
 from core.system import screen_scale, fit_window, create_desktop_shortcut
+from core.export import EXPORT_FORMATS, export_files
+from core.streaming import StreamingTranscriber
+from core.macros import (
+    BUILTIN_ACTIONS, apply_macros, apply_actions, apply_dictionary,
+)
+from core.hotkeys import is_hotkey_pressed, send_ctrl_v
+from core.model import load_model as _load_model_core
+from core.transcription import (
+    transcribe_audio as _transcribe_audio_core,
+    copy_and_paste as _copy_and_paste_core,
+    fast_copy, paste_text,
+)
 _SCALE = screen_scale()
 # Raccourci bureau : en background pour ne pas bloquer le démarrage
 threading.Thread(target=create_desktop_shortcut, daemon=True).start()
@@ -460,7 +479,7 @@ def _tk_exception_handler(exc_type, exc_value, exc_tb):
     log_exception(exc_type, exc_value, exc_tb)
 root.report_callback_exception = _tk_exception_handler
 
-root.title("Whisper Hélio v1.4b")
+root.title("Whisper Hélio v1.5")
 try:
     root.iconbitmap(str(BASE_DIR / "whisper_helio.ico"))
 except (tk.TclError, FileNotFoundError, OSError):
@@ -472,9 +491,9 @@ root.configure(bg=theme()["bg"])
 
 # ══════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════
-# MINIMISATION TASKBAR — WinAPI directe sur root (v1.4b — sans proxy)
+# MINIMISATION TASKBAR — WinAPI directe sur root (v1.5 — sans proxy)
 # ══════════════════════════════════════════════════════════════════════════
-# Architecture v1.4b : on manipule DIRECTEMENT le HWND de root.
+# Architecture v1.5 : on manipule DIRECTEMENT le HWND de root.
 #   État normal   → WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE sur root
 #                   → root invisible de la taskbar et Alt+Tab
 #   Minimisation  → on retire WS_EX_TOOLWINDOW, on ajoute WS_EX_APPWINDOW
@@ -804,6 +823,10 @@ _file_transcribe_window = [None]   # Toplevel résultats transcription fichier
 _help_window = [None]              # Toplevel aide/README
 _file_transcribing = threading.Lock()  # verrou anti-doublon transcription fichier (atomique)
 
+# Derniers segments de transcription fichier (pour export)
+_last_file_segments = [None]   # list[(text, start, end)] ou None
+_last_file_path     = [None]   # chemin du fichier audio source ou None
+
 # Verrou global anti-doublon transcription
 # threading.Lock — acquire(blocking=False) est atomique (pas de TOCTOU)
 _recording_lock = threading.Lock()
@@ -1093,7 +1116,7 @@ btn_help.bind("<Button-1>", lambda e: open_help())
 frame_center = tk.Frame(frame_top, bg=theme()["bg"])
 frame_center.pack(side="left", expand=True)
 
-title_label = tk.Label(frame_center, text="Whisper Hélio v1.4b",
+title_label = tk.Label(frame_center, text="Whisper Hélio v1.5",
                        fg=theme().get("fg_title", COLOR_WHITE),
                        bg=theme()["bg"], font=("Segoe UI", 19, "bold"))
 title_label.pack()
@@ -1307,6 +1330,73 @@ def _draw_pill(canvas, w, h, color, tag, pad=2):
     canvas.create_rectangle(r, pad, w - r, h - pad, fill=color, outline="", tags=tag)
 
 
+def _create_pill_button(
+    parent, width, height, text, color, color_hover,
+    bg=None, emoji=None, text_color="white",
+    font=PILL_FONT, emoji_font=PILL_EMOJI_FONT,
+    tag="pill", pad=2, callback=None, pack_opts=None,
+):
+    """
+    Factory pour bouton pill Canvas avec hover automatique.
+
+    Crée un bouton arrondi (pill) avec optionnellement un emoji à gauche
+    et du texte centré. Gère automatiquement les effets hover Enter/Leave.
+
+    Parameters
+    ----------
+    parent : tk widget parent
+    width, height : dimensions du bouton
+    text : texte affiché
+    color / color_hover : couleurs normal / survol
+    bg : couleur de fond du Canvas (défaut: thème courant)
+    emoji : emoji/icône affiché dans la partie gauche (optionnel)
+    text_color : couleur du texte et de l'emoji
+    font : police du texte
+    emoji_font : police de l'emoji
+    tag : préfixe pour les tags Canvas (bg_{tag}, txt_{tag})
+    pad : marge interne du pill
+    callback : fonction appelée au clic (optionnel)
+    pack_opts : dict d'options pour pack() (optionnel)
+
+    Returns
+    -------
+    tk.Canvas : le bouton (avec tags bg_{tag} et txt_{tag})
+    """
+    if bg is None:
+        bg = theme()["bg"]
+    btn = tk.Canvas(parent, width=width, height=height, bg=bg,
+                    highlightthickness=0, cursor="hand2")
+    if pack_opts:
+        btn.pack(**pack_opts)
+    else:
+        btn.pack()
+
+    bg_tag  = f"bg_{tag}"
+    txt_tag = f"txt_{tag}"
+
+    _draw_pill(btn, width, height, color, bg_tag, pad=pad)
+
+    if emoji:
+        # Emoji dans l'arrondi gauche, texte dans l'espace droit
+        btn.create_text(height // 2, height // 2, text=emoji,
+                        font=emoji_font, fill=text_color)
+        btn.create_text(height + (width - height) // 2, height // 2,
+                        text=text, fill=text_color, font=font, tags=txt_tag)
+    else:
+        # Texte centré
+        btn.create_text(width // 2, height // 2,
+                        text=text, fill=text_color, font=font, tags=txt_tag)
+
+    # Hover automatique
+    btn.bind("<Enter>", lambda e: btn.itemconfig(bg_tag, fill=color_hover))
+    btn.bind("<Leave>", lambda e: btn.itemconfig(bg_tag, fill=color))
+
+    if callback:
+        btn.bind("<Button-1>", callback)
+
+    return btn
+
+
 def _finalize_toplevel(win, desired_w, desired_h, min_w=380, min_h=300):
     """Dimensionne, centre et applique coins arrondis à un Toplevel."""
     win.update_idletasks()
@@ -1458,7 +1548,7 @@ def open_help():
             break
 
     # Titre de l'app en H1
-    text_widget.insert("end", "Whisper Hélio v1.4b\n", "h1")
+    text_widget.insert("end", "Whisper Hélio v1.5\n", "h1")
     text_widget.insert("end", "Dictée vocale Windows — 100% offline\n\n")
 
     _skip_prefixes = ("[![", "<p", "</p>", "<a", "</a>", "<img",
@@ -1493,16 +1583,11 @@ def open_help():
     footer.pack(fill="x", padx=12, pady=(4, 12))
     tk.Frame(footer, height=1, bg=fg2).pack(fill="x", pady=(0, 8))
 
-    _CW, _CH = 120, 34
-    _btn_close = tk.Canvas(footer, width=_CW, height=_CH, bg=bg,
-                           highlightthickness=0, cursor="hand2")
-    _btn_close.pack()
-    _draw_pill(_btn_close, _CW, _CH, COLOR_RED, "bg_hc")
-    _btn_close.create_text(_CW // 2, _CH // 2, text=tr("file_close").upper(),
-                           fill="white", font=("Segoe UI", 11, "bold"))
-    _btn_close.bind("<Enter>", lambda e: _btn_close.itemconfig("bg_hc", fill=COLOR_RED_DARK))
-    _btn_close.bind("<Leave>", lambda e: _btn_close.itemconfig("bg_hc", fill=COLOR_RED))
-    _btn_close.bind("<Button-1>", lambda e: on_close_help())
+    _btn_close = _create_pill_button(
+        footer, 120, PILL_H, tr("file_close").upper(),
+        COLOR_RED, COLOR_RED_DARK, bg=bg, tag="hc",
+        callback=lambda e: on_close_help(),
+    )
 
     # Taille, centrage, coins arrondis
     _finalize_toplevel(win, 600, 700)
@@ -1788,7 +1873,7 @@ def update_wraplength(event=None):
 root.bind("<Configure>", lambda e: (schedule_rounded(e), update_wraplength(e)))
 
 # ── Footer — style v2 : liens gauche + bouton pill cyan droite ───────────
-VERSION = "v1.4b"
+VERSION = "v1.5"
 
 donation_frame = tk.Frame(root, bg=theme()["bg"])
 donation_frame.pack(fill="x", side="bottom", padx=14, pady=(0, 10))
@@ -1822,7 +1907,7 @@ def _don_leave(e):
 donation_label.bind("<Enter>", _don_enter)
 donation_label.bind("<Leave>", _don_leave)
 
-version_label = tk.Label(frame_links, text=f"  •  {VERSION}  •  2026",
+version_label = tk.Label(frame_links, text=f"  •  {VERSION}  •  {time.localtime().tm_year}",
                          fg="#ffffff" if config["theme"] == "dark" else "#333333",
                          bg=theme()["bg"], font=("Segoe UI", 13))
 version_label.pack(side="left")
@@ -1837,8 +1922,9 @@ site_label.pack(side="left")
 site_label.bind("<Button-1>", lambda e: webbrowser.open(SITE_URL))
 site_label._is_clickable = True
 
+_SITE_COLOR = "#f1c40f" if config["theme"] == "dark" else "#b8860b"
 def _site_enter(e): site_label.config(fg=COLOR_BLUE)
-def _site_leave(e): site_label.config(fg=theme()["link"])
+def _site_leave(e): site_label.config(fg=_SITE_COLOR)
 site_label.bind("<Enter>", _site_enter)
 site_label.bind("<Leave>", _site_leave)
 
@@ -2086,6 +2172,20 @@ def open_settings():
         menu["menu"].config(bg=_ibg, fg=_ifg, font=("Consolas", 16))
         menu.pack(side="left", fill="x", expand=True, padx=(8, 0))
 
+    # ── Option streaming temps réel ──────────────────────────────────────
+    v_streaming = tk.BooleanVar(win, value=config.get("streaming", True))
+    _sf_stream = tk.Frame(frame, bg=t["bg"])
+    _sf_stream.pack(fill="x", pady=6)
+    tk.Label(_sf_stream, text=tr("streaming_label"), bg=t["bg"], fg=t["fg2"],
+             font=("Consolas", 16), width=_lbl_w, anchor="w").pack(side="left")
+    _cb_stream = tk.Checkbutton(
+        _sf_stream, variable=v_streaming,
+        bg=t["bg"], fg=t["fg2"], selectcolor=t.get("input_bg", "#2d2d44"),
+        activebackground=t["bg"], activeforeground=t["fg2"],
+        font=("Consolas", 14), text=tr("streaming_desc"),
+    )
+    _cb_stream.pack(side="left", padx=(8, 0))
+
     tk.Label(_set_inner, text=tr("restart_note"), bg=t["bg"], fg=COLOR_RED,
              font=("Consolas", 14)).pack(pady=(15, 8))
 
@@ -2098,6 +2198,13 @@ def open_settings():
     def save_and_close():
         for key, var in _settings_vars.items():
             config[key] = var.get()
+        # Streaming (booléen séparé)
+        config["streaming"] = v_streaming.get()
+        _streamer.enabled = config["streaming"]
+        _streamer.set_language(config["language"])
+        # Si on vient d'activer le streaming et que le modèle n'est pas chargé → charger
+        if _streamer.enabled and not _streamer.is_ready:
+            _streamer.load_async()
         _current_theme[0] = None  # Reset cache thème
         _clear_tr_cache()           # Reset cache traductions
         try:
@@ -2114,22 +2221,12 @@ def open_settings():
     # ── Bouton 💾 SAUVEGARDER — rectangle arrondi bleu ──────────────────────
     _sf = tk.Frame(_set_inner, bg=t["bg"])
     _sf.pack(pady=(8, 20))
-    _SW, _SH2 = 200, 36
-    _btn_sv = tk.Canvas(_sf, width=_SW, height=_SH2, bg=t["bg"], highlightthickness=0, cursor="hand2")
-    _btn_sv.pack()
-    _sv_c  = "#2563eb"
-    _sv_ho = "#1d4ed8"
-    _draw_pill(_btn_sv, _SW, _SH2, _sv_c, "bg_sv")
-    # Icône centrée dans l'arrondi gauche
-    _btn_sv.create_text(_SH2//2, _SH2//2, text="💾", font=("Segoe UI", 11), fill="white", tags="ico_sv")
-    # Texte centré dans l'espace restant (après l'icône)
-    _btn_sv.create_text(_SH2 + (_SW - _SH2)//2, _SH2//2, text=tr("save_button"),
-                        fill="white", font=("Segoe UI", 14, "bold"), tags="txt_sv")
-    def _sv_enter(e): _btn_sv.itemconfig("bg_sv", fill=_sv_ho)
-    def _sv_leave(e): _btn_sv.itemconfig("bg_sv", fill=_sv_c)
-    _btn_sv.bind("<Enter>", _sv_enter)
-    _btn_sv.bind("<Leave>", _sv_leave)
-    _btn_sv.bind("<Button-1>", lambda e: save_and_close())
+    _btn_sv = _create_pill_button(
+        _sf, 200, PILL_H_LG, tr("save_button"),
+        COLOR_SAVE, COLOR_SAVE_HOVER, bg=t["bg"],
+        emoji="💾", font=PILL_FONT_LG, tag="sv",
+        callback=lambda e: save_and_close(),
+    )
 
     # Taille, centrage, coins arrondis
     _finalize_toplevel(win, 620, 720, min_h=400)
@@ -2357,7 +2454,7 @@ def _format_transcription(segments_data):
 def _transcribe_file_worker(filepath, filename):
     """Thread worker : transcrit un fichier audio et affiche les résultats.
 
-    Stratégie d'accélération (v1.4b) :
+    Stratégie d'accélération (v1.5) :
     1. BatchedInferencePipeline (si disponible) : traite N segments en parallèle
        sur le GPU. Le VAD Silero (CPU) découpe l'audio, le GPU traite en batch.
        → CPU et GPU travaillent simultanément en pipeline.
@@ -2454,6 +2551,7 @@ def _transcribe_file_worker(filepath, filename):
                     return
                 if time.perf_counter() - _last_progress_time > _SEGMENT_TIMEOUT:
                     log_error(msg=f"Transcription fichier timeout ({_SEGMENT_TIMEOUT}s sans segment)")
+                    set_statut_safe(tr("file_timeout"), COLOR_ORANGE, COLOR_ORANGE)
                     break
 
                 _last_progress_time = time.perf_counter()
@@ -2479,6 +2577,10 @@ def _transcribe_file_worker(filepath, filename):
                 gc.enable()
 
             result = _format_transcription(_segments_data)
+
+            # Sauvegarder les segments pour l'export
+            _last_file_segments[0] = list(_segments_data)
+            _last_file_path[0] = filepath
 
         except Exception as e:
             log_error(e, f"Transcription fichier échouée: {filepath}")
@@ -2584,8 +2686,9 @@ def _show_file_result(filename, text):
         fill="x", padx=_hdr_pad, pady=(8, 0))
 
     # ── Zone de texte scrollable ─────────────────────────────────────────
+    # NB : text_frame est créé ici mais packé APRÈS le footer (side="bottom")
+    # pour que les boutons soient toujours visibles (même pattern que open_macros)
     text_frame = tk.Frame(win, bg=bg)
-    text_frame.pack(fill="both", expand=True, padx=12, pady=(8, 4))
 
     text_widget = tk.Text(
         text_frame, wrap="word",
@@ -2604,28 +2707,23 @@ def _show_file_result(filename, text):
 
     text_widget.insert("1.0", text)
 
-    # ── Footer : boutons Copier + Fermer ─────────────────────────────────
+    # ── Footer fixe (AVANT text_frame dans le pack pour être toujours visible) ─
+    # side="bottom" réserve l'espace depuis le bas → boutons toujours visibles
     footer = tk.Frame(win, bg=bg)
-    footer.pack(fill="x", padx=12, pady=(4, 12))
+    footer.pack(fill="x", side="bottom", padx=12, pady=(4, 12))
 
     tk.Frame(footer, height=1, bg=fg2).pack(fill="x", pady=(0, 8))
 
     btn_frame = tk.Frame(footer, bg=bg)
     btn_frame.pack()
 
-    # Bouton "Copier tout" — pill bleu
-    _CW, _CH = 150, 34
-    _btn_copy = tk.Canvas(btn_frame, width=_CW, height=_CH, bg=bg,
-                          highlightthickness=0, cursor="hand2")
-    _btn_copy.pack(side="left", padx=(0, 10))
-    _copy_c  = COLOR_BLUE
-    _copy_ho = COLOR_BLUE_DARK
-    _draw_pill(_btn_copy, _CW, _CH, _copy_c, "bg_cp")
-    _btn_copy.create_text(_CH // 2, _CH // 2, text="\U0001F4CB",
-                          font=("Segoe UI", 10), fill="white")
-    _btn_copy.create_text(_CH + (_CW - _CH) // 2, _CH // 2,
-                          text=tr("file_copy_all").upper(),
-                          fill="white", font=("Segoe UI", 11, "bold"), tags="txt_cp")
+    # Bouton "Copier tout" — pill bleu (avec feedback "Copié!")
+    _btn_copy = _create_pill_button(
+        btn_frame, 150, PILL_H, tr("file_copy_all").upper(),
+        COLOR_BLUE, COLOR_BLUE_DARK, bg=bg,
+        emoji="\U0001F4CB", tag="cp",
+        pack_opts={"side": "left", "padx": (0, 10)},
+    )
 
     def _do_copy(e=None):
         content = text_widget.get("1.0", "end-1c")
@@ -2641,29 +2739,28 @@ def _show_file_result(filename, text):
             except Exception as exc:
                 log_error(exc, "pyperclip.copy result")
 
-    def _cp_enter(e): _btn_copy.itemconfig("bg_cp", fill=_copy_ho)
-    def _cp_leave(e): _btn_copy.itemconfig("bg_cp", fill=_copy_c)
-    _btn_copy.bind("<Enter>",    _cp_enter)
-    _btn_copy.bind("<Leave>",    _cp_leave)
-    _btn_copy.bind("<Button-1>", _do_copy)
+    _btn_copy.bind("<Button-1>", _do_copy)  # callback custom (feedback "Copié!")
+
+    # Bouton "Exporter" — pill vert (si segments disponibles)
+    if _last_file_segments[0]:
+        _create_pill_button(
+            btn_frame, 150, PILL_H, tr("export_btn"),
+            COLOR_GREEN, COLOR_GREEN_HOVER, bg=bg,
+            emoji="\U0001F4BE", tag="ex",
+            callback=lambda e: _show_export_dialog(win),
+            pack_opts={"side": "left", "padx": (0, 10)},
+        )
 
     # Bouton "Fermer" — pill rouge
-    _FW, _FH = 120, 34
-    _btn_close_f = tk.Canvas(btn_frame, width=_FW, height=_FH, bg=bg,
-                             highlightthickness=0, cursor="hand2")
-    _btn_close_f.pack(side="left")
-    _close_c  = COLOR_RED
-    _close_ho = COLOR_RED_DARK
-    _draw_pill(_btn_close_f, _FW, _FH, _close_c, "bg_cl")
-    _btn_close_f.create_text(_FW // 2, _FH // 2,
-                             text=tr("file_close").upper(),
-                             fill="white", font=("Segoe UI", 11, "bold"))
+    _create_pill_button(
+        btn_frame, 120, PILL_H, tr("file_close").upper(),
+        COLOR_RED, COLOR_RED_DARK, bg=bg, tag="cl",
+        callback=lambda e: on_close_file(),
+        pack_opts={"side": "left"},
+    )
 
-    def _cl_f_enter(e): _btn_close_f.itemconfig("bg_cl", fill=_close_ho)
-    def _cl_f_leave(e): _btn_close_f.itemconfig("bg_cl", fill=_close_c)
-    _btn_close_f.bind("<Enter>",    _cl_f_enter)
-    _btn_close_f.bind("<Leave>",    _cl_f_leave)
-    _btn_close_f.bind("<Button-1>", lambda e: on_close_file())
+    # ── Pack text_frame APRÈS le footer → il prend l'espace restant ──
+    text_frame.pack(fill="both", expand=True, padx=12, pady=(8, 4))
 
     # Raccourcis clavier
     win.bind("<Escape>", lambda e: on_close_file())
@@ -2677,12 +2774,207 @@ def _show_file_result(filename, text):
     _file_transcribe_window[0] = win
 
 
+# ── Fenêtre Export ────────────────────────────────────────────────────────
+
+def _open_folder(path: str) -> None:
+    """Ouvre un dossier dans l'Explorateur Windows."""
+    try:
+        os.startfile(os.path.realpath(path))
+    except Exception:
+        pass   # pas critique
+
+
+def _show_export_dialog(parent_win):
+    """
+    Affiche la fenêtre de sélection des formats d'export.
+
+    Propose 5 formats (SRT, VTT, TXT horodaté, TXT brut, JSON)
+    via des cases à cocher, exporte les fichiers dans le même dossier
+    que le fichier audio source, et affiche un feedback visuel.
+    """
+    segments = _last_file_segments[0]
+    source   = _last_file_path[0]
+    if not segments or not source:
+        return
+
+    t  = theme()
+    bg = t["bg"]
+    fg = t["fg"]
+    fg2 = t["fg2"]
+
+    # Informations sur la source
+    _src_dir  = os.path.dirname(source) or "."
+    _src_name = os.path.splitext(os.path.basename(source))[0]
+    _n_segs   = len(segments)
+    _duration = max((end for _, _, end in segments), default=0.0)
+    _dur_min  = int(_duration // 60)
+    _dur_sec  = int(_duration % 60)
+
+    dlg = tk.Toplevel(parent_win)
+    dlg.title("Exporter — Whisper Hélio")
+    dlg.configure(bg=bg)
+    dlg.attributes("-topmost", True)
+    dlg.attributes("-alpha", 0.95)
+    dlg.overrideredirect(True)
+    dlg.resizable(False, False)
+
+    # ── En-tête (déplaçable) ──
+    hdr = tk.Frame(dlg, bg=bg)
+    hdr.pack(fill="x", padx=16, pady=(14, 6))
+    tk.Label(hdr, text=f"💾  {tr('export_title')}",
+             font=("Segoe UI", 13, "bold"), fg=fg, bg=bg).pack(anchor="w")
+    _info_txt = f"{_n_segs} {tr('export_segments')} · {_dur_min}:{_dur_sec:02d}"
+    tk.Label(hdr, text=_info_txt,
+             font=("Segoe UI", 9), fg=fg2, bg=bg).pack(anchor="w")
+
+    # ── Séparateur ──
+    tk.Frame(dlg, height=1, bg=fg2).pack(fill="x", padx=16, pady=(6, 8))
+
+    # ── Destination (modifiable) ──
+    _dest_dir = [_src_dir]   # variable mutable — répertoire de sortie
+
+    dest_frame = tk.Frame(dlg, bg=bg)
+    dest_frame.pack(fill="x", padx=20, pady=(0, 8))
+    tk.Label(dest_frame, text=tr("export_folder"),
+             font=("Segoe UI", 9), fg=fg2, bg=bg).pack(side="left")
+
+    def _short(path):
+        return path if len(path) <= 40 else "…" + path[-37:]
+
+    dest_lbl = tk.Label(dest_frame, text=_short(_dest_dir[0]),
+                        font=("Consolas", 8), fg=COLOR_BLUE, bg=bg,
+                        cursor="hand2")
+    dest_lbl.pack(side="left", padx=(4, 0))
+    dest_lbl.bind("<Button-1>", lambda e: _open_folder(_dest_dir[0]))
+
+    def _browse_dest():
+        dlg.attributes("-topmost", False)
+        try:
+            chosen = filedialog.askdirectory(
+                parent=dlg,
+                initialdir=_dest_dir[0],
+                title=tr("export_browse"),
+            )
+        finally:
+            dlg.attributes("-topmost", True)
+        if chosen:
+            _dest_dir[0] = chosen
+            dest_lbl.configure(text=_short(chosen))
+
+    btn_browse = tk.Label(dest_frame, text="📂", font=("Segoe UI", 11),
+                          fg=fg2, bg=bg, cursor="hand2", padx=4)
+    btn_browse.pack(side="left", padx=(4, 0))
+    btn_browse.bind("<Button-1>", lambda e: _browse_dest())
+
+    # ── Cases à cocher des formats ──
+    checks_frame = tk.Frame(dlg, bg=bg)
+    checks_frame.pack(fill="x", padx=20, pady=(0, 6))
+
+    format_vars = {}
+    _defaults = {"srt", "vtt", "txt_ts"}
+
+    # Descriptions courtes pour chaque format
+    _format_desc = {
+        "srt":    "Import Premiere Pro, DaVinci, VLC…",
+        "vtt":    "YouTube, navigateurs web",
+        "txt_ts": "Relecture avec repères temporels",
+        "txt":    "Copier-coller simple",
+        "json":   "Traitement automatisé, API",
+    }
+
+    for key, fmt in EXPORT_FORMATS.items():
+        row = tk.Frame(checks_frame, bg=bg)
+        row.pack(fill="x", anchor="w")
+
+        var = tk.BooleanVar(value=(key in _defaults))
+        format_vars[key] = var
+
+        cb = tk.Checkbutton(
+            row, text=fmt["label"], variable=var,
+            font=("Segoe UI", 11), fg=fg, bg=bg,
+            selectcolor=bg, activebackground=bg, activeforeground=fg,
+            anchor="w", padx=4, pady=1,
+        )
+        cb.pack(side="left")
+
+        desc = _format_desc.get(key, "")
+        if desc:
+            tk.Label(row, text=f"— {desc}",
+                     font=("Segoe UI", 8), fg=fg2, bg=bg).pack(side="left", padx=(2, 0))
+
+    # ── Status label ──
+    status_var = tk.StringVar(value="")
+    status_lbl = tk.Label(dlg, textvariable=status_var,
+                          font=("Segoe UI", 9), fg=COLOR_GREEN, bg=bg,
+                          wraplength=300, justify="left")
+    status_lbl.pack(fill="x", padx=16, pady=(4, 4))
+
+    # ── Boutons ──
+    btn_bar = tk.Frame(dlg, bg=bg)
+    btn_bar.pack(fill="x", padx=16, pady=(4, 14))
+
+    # Bouton "Exporter" — pill vert
+    _export_done = [False]   # empêche le double-clic
+
+    def _do_export_action(e=None):
+        if _export_done[0]:
+            return
+        selected = [k for k, v in format_vars.items() if v.get()]
+        if not selected:
+            status_var.set(f"⚠ {tr('export_select_one')}")
+            status_lbl.configure(fg=COLOR_RED)
+            return
+        _export_done[0] = True
+        try:
+            created = export_files(
+                segments, source, selected,
+                source_filename=os.path.basename(source),
+                output_dir=_dest_dir[0],
+            )
+            if created:
+                status_var.set("✅ " + ", ".join(created))
+                status_lbl.configure(fg=COLOR_GREEN)
+                log_error(msg=f"[EXPORT] {len(created)} fichier(s) : {', '.join(created)}")
+            else:
+                status_var.set(f"⚠ {tr('export_no_file')}")
+                status_lbl.configure(fg=COLOR_RED)
+                _export_done[0] = False
+        except Exception as exc:
+            log_error(exc, "Export échoué")
+            status_var.set(f"❌ {str(exc)[:60]}")
+            status_lbl.configure(fg=COLOR_RED)
+            _export_done[0] = False
+
+    _create_pill_button(
+        btn_bar, 140, PILL_H, tr("export_btn"),
+        COLOR_GREEN, COLOR_GREEN_HOVER, bg=bg, tag="go",
+        callback=_do_export_action,
+        pack_opts={"side": "left", "padx": (0, 10)},
+    )
+
+    # Bouton "Fermer" — pill gris
+    _create_pill_button(
+        btn_bar, 110, PILL_H, tr("export_close"),
+        fg2, COLOR_GREY_HOVER, bg=bg, tag="cn",
+        callback=lambda e: dlg.destroy(),
+        pack_opts={"side": "left"},
+    )
+
+    dlg.bind("<Escape>", lambda e: dlg.destroy())
+
+    # ── Drag fenêtre (overrideredirect) ──
+    _bind_toplevel_drag(hdr, dlg)
+
+    # Taille, centrage, coins arrondis
+    _finalize_toplevel(dlg, 380, 400, min_w=340, min_h=320)
+
+
 # ── Fenêtre Macros ────────────────────────────────────────────────────────
 def process_and_paste(texte, delay=PASTE_DELAY):
     """Applique macros + actions + dictionnaire puis colle. Retourne le texte final."""
-    texte = apply_macros(texte)
-    texte = apply_actions(texte)
-    texte = apply_dictionary(texte)
+    texte = apply_macros(texte, config)
+    texte = apply_actions(texte, config, set_status=set_statut_safe)
+    texte = apply_dictionary(texte, config)
     # Capitaliser la première lettre (Whisper renvoie parfois en minuscule)
     if texte and texte[0].islower():
         texte = texte[0].upper() + texte[1:]
@@ -2691,216 +2983,8 @@ def process_and_paste(texte, delay=PASTE_DELAY):
         copy_and_paste(texte, delay=delay)
     return texte
 
-def _build_macros_cache():
-    """Compile les patterns regex des macros — le NOM est le déclencheur direct."""
-    macros = config.get("macros", [])
-    if not macros:
-        regex_cache["macros"] = []
-        return
-    entries = []
-    for macro in macros:
-        name = macro.get("name", "").strip()
-        repl = macro.get("text", "")
-        if not name:
-            continue
-        # Le nom peut contenir des espaces ou underscores → on normalise
-        name_pattern = re.escape(name.replace("_", " "))
-        pat = re.compile(r'\b' + name_pattern + r'\b', re.IGNORECASE)
-        entries.append((pat, repl))
-    regex_cache["macros"] = entries
 
-def apply_macros(text):
-    """Remplace les macros vocales dans le texte transcrit."""
-    if not text:
-        return text
-    if regex_cache["macros"] is None:
-        _build_macros_cache()
-    entries = regex_cache["macros"]
-    if not entries:
-        return text
-    result = text
-    for pat, repl in entries:
-        result = pat.sub(lambda _: repl, result)   # lambda évite l'interprétation des backslashes
-    return result
-
-# ── Actions vocales prédéfinies ───────────────────────────────────────────
-_office_cache = {}
-
-def _find_office(app_name):
-    """Cherche Excel ou Word dans les emplacements Office standard (résultat mis en cache)."""
-    key = app_name.upper()
-    if key in _office_cache:
-        return _office_cache[key]
-    candidates = [
-        rf"C:\Program Files\Microsoft Office\root\Office16\{app_name}",
-        rf"C:\Program Files\Microsoft Office\root\Office15\{app_name}",
-        rf"C:\Program Files (x86)\Microsoft Office\root\Office16\{app_name}",
-        rf"C:\Program Files (x86)\Microsoft Office\Office16\{app_name}",
-        rf"C:\Program Files (x86)\Microsoft Office\Office15\{app_name}",
-        rf"C:\Program Files\Microsoft Office\Office16\{app_name}",
-    ]
-    result = next((p for p in candidates if os.path.exists(p)), None)
-    _office_cache[key] = result
-    return result
-
-_browser_cache = {}
-
-def _find_browser(exe_name, *extra_paths):
-    """Cherche un navigateur dans les emplacements standards (résultat mis en cache)."""
-    key = exe_name.lower()
-    if key in _browser_cache:
-        return _browser_cache[key]
-    candidates = [
-        rf"C:\Program Files\{extra_paths[0] if extra_paths else ''}\{exe_name}",
-        rf"C:\Program Files (x86)\{extra_paths[0] if extra_paths else ''}\{exe_name}",
-    ] if extra_paths else []
-    candidates += [rf"C:\Program Files\{exe_name}", rf"C:\Program Files (x86)\{exe_name}"]
-    result = next((p for p in candidates if os.path.exists(p)), exe_name)
-    _browser_cache[key] = result
-    return result
-
-# Actions intégrées : { nom_vocal: (chemin_ou_commande, label_affichage) }
-BUILTIN_ACTIONS = {
-    "explorateur":  ("explorer.exe",    "Explorateur Windows"),
-    "explorer":     ("explorer.exe",    "Explorateur Windows"),
-    "bureau":       (["explorer.exe", "shell:Desktop"], "Bureau"),
-    "calculatrice": ("calc.exe",        "Calculatrice"),
-    "bloc-notes":   ("notepad.exe",     "Bloc-notes"),
-    "notepad":      ("notepad.exe",     "Bloc-notes"),
-    "taches":       ("taskmgr.exe",     "Gestionnaire de taches"),
-    "paint":        ("mspaint.exe",     "Paint"),
-    "excel":        (None,              "Excel"),   # chemin résolu dynamiquement
-    "word":         (None,              "Word"),    # chemin résolu dynamiquement
-    "chrome":       (None,              "Chrome"),
-    "firefox":      (None,              "Firefox"),
-    "edge":         ("msedge.exe",      "Microsoft Edge"),
-}
-
-def _resolve_builtin(name):
-    """Résout le chemin réel d'une action intégrée."""
-    entry = BUILTIN_ACTIONS.get(name.lower())
-    if not entry:
-        return None, None
-    cmd, label = entry
-    if cmd is not None:
-        return cmd, label
-    # Résolution dynamique pour les programmes dont le chemin varie
-    n = name.lower()
-    if n == "excel":
-        path = _find_office("EXCEL.EXE")
-        return path or "excel.exe", label   # fallback via PATH
-    if n == "word":
-        path = _find_office("WINWORD.EXE")
-        return path or "winword.exe", label  # fallback via PATH
-    if n == "chrome":
-        path = _find_browser("chrome.exe", "Google\\Chrome\\Application")
-        return path, label   # _find_browser retourne exe_name si introuvable
-    if n == "firefox":
-        path = _find_browser("firefox.exe", "Mozilla Firefox")
-        return path, label
-    return None, label
-
-def _build_actions_cache():
-    """Compile les patterns regex des actions (mis en cache)."""
-    trigger = config.get("action_trigger", "action").lower().strip()
-    if not trigger:
-        regex_cache["actions"] = []
-        return
-    all_actions = {}
-    for name in BUILTIN_ACTIONS:
-        all_actions[name] = ("builtin", name)
-    for act in config.get("actions", []):
-        name = act.get("name", "").lower().strip()
-        path = act.get("path", "").strip()
-        if name and path:
-            all_actions[name] = ("custom", path)
-    entries = []
-    for name, (kind, value) in all_actions.items():
-        # Normaliser underscores → espaces (Whisper transcrit avec espaces)
-        name_pattern = re.escape(name.replace("_", " "))
-        pat = re.compile(r'\b' + re.escape(trigger) + r'\s+' + name_pattern + r'\b', re.IGNORECASE)
-        entries.append((pat, name, kind, value))
-    regex_cache["actions"] = entries
-
-def apply_actions(text):
-    """Détecte et exécute les actions vocales. Retourne le texte nettoyé."""
-    if not text:
-        return text
-    if regex_cache["actions"] is None:
-        _build_actions_cache()
-    entries = regex_cache["actions"]
-    if not entries:
-        return text
-
-    result = text
-    for pat, name, kind, value in entries:
-        if not pat.search(result):
-            continue
-        launched     = False
-        display_name = name  # valeur par défaut
-        try:
-            if kind == "builtin":
-                cmd, label = _resolve_builtin(name)
-                display_name = label or name
-                if cmd:
-                    subprocess.Popen(cmd if isinstance(cmd, list) else [cmd])
-                    launched = True
-                else:
-                    set_statut_safe(tr("action_not_found", name=display_name), COLOR_ORANGE, COLOR_ORANGE)
-            else:  # custom
-                # Sécurité : accepter uniquement les .exe locaux (pas de .bat/.cmd/.vbs/UNC)
-                # realpath résout les .., symlinks, et chemins relatifs déguisés
-                _real_path = os.path.realpath(value)
-                _val_lower = _real_path.lower()
-                _is_safe = (
-                    _val_lower.endswith('.exe')
-                    and not _real_path.startswith('\\\\')  # bloquer UNC \\serveur\...
-                    and not _real_path.startswith('//')     # bloquer UNC //serveur/...
-                    and os.path.isabs(_real_path)           # chemin absolu obligatoire
-                    and os.path.isfile(_real_path)          # isfile (pas isdir)
-                )
-                if _is_safe:
-                    subprocess.Popen([_real_path])
-                    launched = True
-                else:
-                    set_statut_safe(tr("action_not_found", name=display_name), COLOR_ORANGE, COLOR_ORANGE)
-            if launched:
-                set_statut_safe(tr("action_launched", name=display_name), COLOR_GREEN, COLOR_GREEN)
-        except Exception as e:
-            log_error(e)
-        if launched:
-            result = pat.sub("", result).strip()
-    return result
-
-def _build_dictionary_cache():
-    """Compile les patterns regex du dictionnaire (mis en cache)."""
-    dictionary = config.get("dictionary", [])
-    if not dictionary:
-        regex_cache["dictionary"] = []
-        return
-    entries = []
-    for entry in dictionary:
-        wrong   = entry.get("wrong", "").strip()
-        correct = entry.get("correct", "")
-        if not wrong:
-            continue
-        pat = re.compile(r'\b' + re.escape(wrong) + r'\b', re.IGNORECASE)
-        entries.append((pat, correct))
-    regex_cache["dictionary"] = entries
-
-def apply_dictionary(text):
-    """Corrige les mots mal transcrits par Whisper via le dictionnaire utilisateur."""
-    if not text:
-        return text
-    if regex_cache["dictionary"] is None:
-        _build_dictionary_cache()
-    entries = regex_cache["dictionary"]
-    if not entries:
-        return text
-    result = text
-    for pat, repl in entries:
-        result = pat.sub(lambda _: repl, result)   # lambda évite l'interprétation des backslashes
-    return result
+# (macros / actions / dictionnaire → core/macros.py)
 
 def _make_scroll_area(parent, bg):
     """Crée une zone scrollable (Canvas + Scrollbar + Frame intérieur).
@@ -2993,16 +3077,12 @@ def _build_macros_tab(notebook, win, t):
     tk.Label(fh_m, text=tr("macro_col_text"), bg=bg, fg=fg2,
              font=("Consolas", 14, "bold"), anchor="w").pack(side="left", padx=(6, 0))
 
-    _btn_add_m = tk.Canvas(tab, width=150, height=32, bg=bg, highlightthickness=0, cursor="hand2")
-    _btn_add_m.pack(pady=(6, 4))
-    _draw_pill(_btn_add_m, 150, 32, vc, "bg_btn_add_m")
-    _btn_add_m.create_text(32//2, 32//2, text="+", font=("Segoe UI", 13, "bold"), fill=bg)
-    _btn_add_m.create_text(32+(150-32)//2, 32//2, text=tr("macro_add"),
-                       fill=bg, font=("Segoe UI", 14, "bold"))
-    def _btn_add_m_enter(e): _btn_add_m.itemconfig("bg_btn_add_m", fill=COLOR_RED)
-    def _btn_add_m_leave(e): _btn_add_m.itemconfig("bg_btn_add_m", fill=vc)
-    _btn_add_m.bind("<Enter>", _btn_add_m_enter)
-    _btn_add_m.bind("<Leave>", _btn_add_m_leave)
+    _btn_add_m = _create_pill_button(
+        tab, 150, PILL_H, tr("macro_add"),
+        vc, COLOR_RED, bg=bg, emoji="+", text_color=bg,
+        font=PILL_FONT_LG, emoji_font=("Segoe UI", 13, "bold"),
+        tag="btn_add_m", pack_opts={"pady": (6, 4)},
+    )
 
     cs_m, if_m, _mw_m = _make_scroll_area(tab, bg)
 
@@ -3113,22 +3193,12 @@ def _build_actions_tab(notebook, win, t):
     tk.Label(fh_a, text=tr("action_col_path"), bg=bg, fg=fg2,
              font=("Consolas", 14, "bold"), anchor="w").pack(side="left", padx=(6, 0))
 
-    _W_BTN_A = 180
-    _H_BTN_A = 30
-    _btn_add_a = tk.Canvas(tab, width=_W_BTN_A, height=_H_BTN_A,
-                           bg=bg, highlightthickness=0, cursor="hand2")
-    _btn_add_a.pack(pady=(2, 4))
-    _draw_pill(_btn_add_a, _W_BTN_A, _H_BTN_A, vc, "bg_btn_add_a", pad=1)
-    _r = _H_BTN_A // 2
-    _btn_add_a.create_text(_r - 2, _H_BTN_A//2, text="+",
-                           font=("Segoe UI", 13, "bold"), fill=bg)
-    _btn_add_a.create_text(_r + (_W_BTN_A - _r) // 2 + 2, _H_BTN_A//2,
-                           text=tr("action_col_add"),
-                           fill=bg, font=("Segoe UI", 14, "bold"))
-    def _btn_add_a_enter(e): _btn_add_a.itemconfig("bg_btn_add_a", fill=COLOR_GREEN)
-    def _btn_add_a_leave(e): _btn_add_a.itemconfig("bg_btn_add_a", fill=vc)
-    _btn_add_a.bind("<Enter>", _btn_add_a_enter)
-    _btn_add_a.bind("<Leave>", _btn_add_a_leave)
+    _btn_add_a = _create_pill_button(
+        tab, 180, PILL_H, tr("action_col_add"),
+        vc, COLOR_GREEN, bg=bg, emoji="+", text_color=bg,
+        font=PILL_FONT_LG, emoji_font=("Segoe UI", 13, "bold"),
+        tag="btn_add_a", pad=1, pack_opts={"pady": (2, 4)},
+    )
 
     # Zone scrollable actions perso (custom pour hauteur fixe)
     _fa_scroll_outer = tk.Frame(tab, bg=bg)
@@ -3255,22 +3325,12 @@ def _build_dict_tab(notebook, win, t):
     tk.Label(fh_d, text=tr("dict_correct"), bg=bg, fg=fg2,
              font=("Consolas", 14, "bold"), anchor="w").pack(side="left")
 
-    _W_BTN_D = 180
-    _H_BTN_D = 32
-    _btn_add_d = tk.Canvas(tab, width=_W_BTN_D, height=_H_BTN_D,
-                           bg=bg, highlightthickness=0, cursor="hand2")
-    _btn_add_d.pack(pady=(6, 4))
-    _draw_pill(_btn_add_d, _W_BTN_D, _H_BTN_D, vc, "bg_btn_add_d", pad=1)
-    _rd = _H_BTN_D // 2
-    _btn_add_d.create_text(_rd - 2, _H_BTN_D//2, text="+",
-                           font=("Segoe UI", 13, "bold"), fill=bg)
-    _btn_add_d.create_text(_rd + (_W_BTN_D - _rd) // 2 + 2, _H_BTN_D//2,
-                           text=tr("dict_col_add"),
-                           fill=bg, font=("Segoe UI", 14, "bold"))
-    def _btn_add_d_enter(e): _btn_add_d.itemconfig("bg_btn_add_d", fill=COLOR_RED)
-    def _btn_add_d_leave(e): _btn_add_d.itemconfig("bg_btn_add_d", fill=vc)
-    _btn_add_d.bind("<Enter>", _btn_add_d_enter)
-    _btn_add_d.bind("<Leave>", _btn_add_d_leave)
+    _btn_add_d = _create_pill_button(
+        tab, 180, PILL_H, tr("dict_col_add"),
+        vc, COLOR_RED, bg=bg, emoji="+", text_color=bg,
+        font=PILL_FONT_LG, emoji_font=("Segoe UI", 13, "bold"),
+        tag="btn_add_d", pad=1, pack_opts={"pady": (6, 4)},
+    )
 
     cs_d, if_d, _mw_d = _make_scroll_area(tab, bg)
 
@@ -3387,14 +3447,14 @@ def open_macros():
     tk.Frame(win, height=1, bg=t.get("vu_color", "#22d3ee")).pack(fill="x", padx=_mac_hdr_pad, pady=(8, 0))
 
     # ── Notebook (onglets) ─────────────────────────────────────────────────
-    style = ttk.Style(win)
-    style.theme_use("default")
-    style.configure("Helio.TNotebook",     background=bg, borderwidth=0)
-    style.configure("Helio.TNotebook.Tab",
+    _nb_style = ttk.Style(win)
+    _nb_style.theme_use("default")
+    _nb_style.configure("Helio.TNotebook",     background=bg, borderwidth=0)
+    _nb_style.configure("Helio.TNotebook.Tab",
                     background=accent, foreground=fg2,
                     font=("Segoe UI", 14, "bold"),
                     padding=[14, 7])
-    style.map("Helio.TNotebook.Tab",
+    _nb_style.map("Helio.TNotebook.Tab",
               background=[("selected", vc)],
               foreground=[("selected", bg)])
 
@@ -3406,19 +3466,11 @@ def open_macros():
 
     tk.Frame(footer_frame, height=1, bg=fg2).pack(fill="x", pady=(0, 8))
 
-    _MSW, _MSH = 200, 36
-    _btn_save = tk.Canvas(footer_frame, width=_MSW, height=_MSH, bg=bg, highlightthickness=0, cursor="hand2")
-    _btn_save.pack()
-    _bs_c  = "#2563eb"
-    _bs_ho = "#1d4ed8"
-    _draw_pill(_btn_save, _MSW, _MSH, _bs_c, "bg_bs")
-    _btn_save.create_text(_MSH//2, _MSH//2, text="💾", font=("Segoe UI", 11), fill="white")
-    _btn_save.create_text(_MSH + (_MSW-_MSH)//2, _MSH//2, text=tr("save_button"),
-                           fill="white", font=("Segoe UI", 14, "bold"))
-    def _bs_enter(e): _btn_save.itemconfig("bg_bs", fill=_bs_ho)
-    def _bs_leave(e): _btn_save.itemconfig("bg_bs", fill=_bs_c)
-    _btn_save.bind("<Enter>", _bs_enter)
-    _btn_save.bind("<Leave>", _bs_leave)
+    _btn_save = _create_pill_button(
+        footer_frame, 200, PILL_H_LG, tr("save_button"),
+        COLOR_SAVE, COLOR_SAVE_HOVER, bg=bg,
+        emoji="💾", font=PILL_FONT_LG, tag="bs",
+    )
     # bind save_all défini plus bas — on le connecte après
 
     notebook = ttk.Notebook(win, style="Helio.TNotebook")
@@ -3461,11 +3513,7 @@ def open_macros():
             if len(config.get(_key, [])) > _MAX_ENTRIES:
                 config[_key] = config[_key][:_MAX_ENTRIES]
         save_config(config)   # save_config appelle déjà invalidate_regex_cache()
-        _macros_window[0] = None
-        try:
-            win.destroy()
-        except tk.TclError:
-            pass
+        on_close_macros()     # cancel _rounded_job + destroy (pas de race condition)
 
     # Connecter le bouton save (défini plus haut) à save_all
     _btn_save.bind("<Button-1>", lambda e: save_all())
@@ -3482,7 +3530,6 @@ is_recording = threading.Event()
 # Pré-buffer : capture en permanence les dernières ~0.5s d'audio
 # Quand l'enregistrement démarre, ces données sont injectées dans le buffer
 # → plus de perte des premiers mots lors de l'appui sur le bouton
-from collections import deque
 _PRE_BUFFER_BLOCKS = 3  # 3 × 4096 = 12288 samples = ~0.77s à 16 kHz
 _pre_buffer = deque(maxlen=_PRE_BUFFER_BLOCKS)
 
@@ -3497,7 +3544,10 @@ def audio_callback(indata, frames, time_info, status):
             audio_buffer.append(indata)
             # RMS via np.dot (zéro allocation numpy intermédiaire)
             flat = indata.ravel()
-            rms = (np.dot(flat, flat) / flat.size) ** 0.5
+            if flat.size > 0:
+                rms = (np.dot(flat, flat) / flat.size) ** 0.5
+            else:
+                rms = 0.0
             v = float(rms) * VU_RMS_GAIN
             vu_level[0] = min(1.0, v) if v == v else 0.0  # NaN != NaN
         else:
@@ -3535,7 +3585,6 @@ def _set_mic_volume_100():
             msg = f"Échec mise à 100% du volume micro: {e}"
         finally:
             # Forcer GC des objets COM dans CE thread (apartment correct)
-            import gc
             gc.collect()
             gc.collect()
             # Neutraliser __del__ de comtypes pour empêcher crash GC cross-thread
@@ -3559,330 +3608,141 @@ except sd.PortAudioError as e:
     log_error(e, "Aucun microphone détecté")
     stream[0] = None
 
-# ── Clavier — keyboard + GetAsyncKeyState (hybride) ──────────────────────
-# keyboard (WH_KEYBOARD_LL) : fiable sur TOUS les laptops pour F5-F12,
-#   pause, scroll_lock, insert — impact perf négligeable (quelques frappes/s).
-# GetAsyncKeyState : utilisé pour les boutons souris (mouse_x1/x2)
-#   car keyboard ne détecte pas les clics souris.
-# Le hook souris WH_MOUSE_LL est toujours supprimé (milliers d'événements/s).
-try:
-    import keyboard as _kb
-    _has_keyboard = True
-except ImportError:
-    _has_keyboard = False
+# ── Streaming temps réel (modèle tiny en parallèle) ──────────────────────
+_streamer = StreamingTranscriber(
+    language=config["language"],
+    device="cpu",     # tiny toujours sur CPU — ne pas concurrencer le GPU principal
+    on_log=lambda msg: log_error(msg=msg),
+)
+_streamer.enabled = config.get("streaming", True)
 
-_GetAsyncKeyState = _u32.GetAsyncKeyState
-_GetAsyncKeyState.argtypes = [ctypes.c_int]
-_GetAsyncKeyState.restype  = ctypes.c_short
+# Label flottant pour l'aperçu streaming (Toplevel overrideredirect)
+_streaming_label_win = [None]     # Toplevel ou None
+_streaming_label_text = [None]    # tk.Label à l'intérieur
+_streaming_job = [None]           # after() id pour le polling position curseur
 
-_VK_CODES = {
-    "f5": 0x74, "f6": 0x75, "f7": 0x76, "f8": 0x77,
-    "f9": 0x78, "f10": 0x79, "f11": 0x7A, "f12": 0x7B,
-    "pause": 0x13, "scroll_lock": 0x91, "insert": 0x2D,
-    "mouse_x1": 0x05, "mouse_x2": 0x06,  # VK_XBUTTON1 / VK_XBUTTON2
-}
-
-_keybd_event = _u32.keybd_event
-_keybd_event.argtypes = [ctypes.c_byte, ctypes.c_byte, ctypes.c_ulong, ctypes.c_void_p]
-_keybd_event.restype  = None
-_KEYEVENTF_KEYUP = 0x0002
-_VK_CONTROL = 0x11
-_VK_V       = 0x56
-
-def _send_ctrl_v():
-    """Envoie Ctrl+V via keybd_event (pas de hook système)."""
-    _keybd_event(_VK_CONTROL, 0, 0, 0)
-    _keybd_event(_VK_V, 0, 0, 0)
-    time.sleep(0.02)
-    _keybd_event(_VK_V, 0, _KEYEVENTF_KEYUP, 0)
-    _keybd_event(_VK_CONTROL, 0, _KEYEVENTF_KEYUP, 0)
-
-# ── Souris — détection via GetAsyncKeyState (zéro hook, zéro lag) ─────────
-# Le hook souris WH_MOUSE_LL est supprimé : il interceptait CHAQUE pixel
-# de mouvement → micro-saccades. GetAsyncKeyState pour mouse_x1/x2 uniquement.
-
-def is_hotkey_pressed(hk):
-    """Vérifie si le hotkey est pressé.
-    GetAsyncKeyState EN PRIORITÉ — API directe, pas de hook, fiable après reboot.
-    keyboard lib en fallback seulement (son hook WH_KEYBOARD_LL peut être
-    silencieusement supprimé par Windows si le système est chargé au boot).
-    """
-    # 1) GetAsyncKeyState — toujours fiable (pas de hook, requête directe au noyau)
-    vk = _VK_CODES.get(hk)
-    if vk is not None and bool(_GetAsyncKeyState(vk) & 0x8000):
-        return True
-    # 2) Fallback keyboard lib pour les cas où GetAsyncKeyState rate la touche
-    if _has_keyboard and not hk.startswith("mouse_"):
-        try:
-            return _kb.is_pressed(hk)
-        except Exception:
-            pass
-    return False
+_STREAMING_INTERVAL_MS = 1500     # Transcrire toutes les 1.5 secondes
+_STREAMING_LABEL_OFFSET_Y = 35    # Pixels sous le curseur
 
 
-# ── Transcription helper ──────────────────────────────────────────────────
-def transcribe_audio(model, audio_data, use_vad=True):
-    """Transcrit un tableau numpy en texte."""
-    if len(audio_data) < MIN_AUDIO_SAMPLES:
-        log_error(msg=f"[SKIP] Audio trop court: {len(audio_data)} samples "
-                      f"(min={MIN_AUDIO_SAMPLES}, soit {MIN_AUDIO_SAMPLES/SAMPLE_RATE:.1f}s)")
-        return ""
-
-    # Skip si silence (VAD)
-    if use_vad and not has_voice(audio_data):
-        _dur = len(audio_data) / SAMPLE_RATE
-        log_error(msg=f"[SKIP] VAD silence détecté ({_dur:.1f}s audio, seuil={VAD_THRESHOLD})")
-        return ""
-
-    _t0 = time.perf_counter()
-    try:
-        gc.disable()   # évite les pauses GC pendant l'inférence (~1-3s, réactivé dans finally)
-        segments, _ = model.transcribe(
-            audio_data,
-            language=config["language"],
-            beam_size=1,
-            best_of=1,
-            temperature=(0, 0.2, 0.4),  # 3-pass voting : meilleure qualité accents/mots flous
-            condition_on_previous_text=False,
-            without_timestamps=True,   # skip les tokens de timestamps inutiles en dictée → ~20-30% plus rapide
-            no_speech_threshold=0.55,  # 0.55 : récupère mots en début/fin de phrase (0.6 trop agressif)
-            vad_filter=False,  # onnxruntime exclu du build — notre has_voice() filtre déjà
-        )
-        result = " ".join(s.text.strip() for s in segments).strip()
-        _elapsed = time.perf_counter() - _t0
-        _dur = len(audio_data) / SAMPLE_RATE
-        log_error(msg=f"[PERF] Transcription: {_elapsed:.2f}s pour {_dur:.1f}s audio "
-                      f"({detected_device}/{detected_compute}) ratio={_elapsed/_dur:.2f}x")
-        return result
-    except Exception as e:
-        log_error(e, f"Transcription échouée (device={detected_device})")
-        return ""
-    finally:
-        gc.enable()
-
-# ── Copie et collage ──────────────────────────────────────────────────────
-def fast_copy(text):
-    """Copie le texte dans le presse-papier. Retourne True si réussi."""
-    try:
-        pyperclip.copy(text)
-        return True
-    except Exception as e:
-        log_error(e, "fast_copy: presse-papier verrouillé")
-        return False
-
-def paste_text():
-    """Colle le texte depuis le presse-papier via keybd_event (zéro hook)."""
-    try:
-        _send_ctrl_v()
-    except Exception:
-        try:
-            pyautogui.hotkey("ctrl", "v")
-        except Exception as e2:
-            log_error(e2, "paste_text: les deux méthodes ont échoué")
-
-_last_pasted_text = [""]   # dernier texte collé — pour l'espace intelligent
-
-def copy_and_paste(text, delay=PASTE_DELAY):
-    """Copie et colle le texte avec espace intelligent avant le texte.
-
-    Si le dernier texte collé se terminait par un signe de ponctuation
-    ou une lettre/chiffre, on préfixe automatiquement un espace pour éviter
-    que le texte collé ne s'accroche au mot/ponctuation précédent.
-    Note : on utilise _last_pasted_text (pas le presse-papier, qui contient
-    notre propre texte précédent et non le contexte du document).
-    """
-    if not text:
+def _show_streaming_label(text):
+    """Affiche ou met à jour le label flottant d'aperçu streaming."""
+    if not text or not _streamer.enabled:
+        _hide_streaming_label()
         return
 
-    # Espace intelligent basé sur le dernier texte qu'on a collé
-    prefix = ""
-    prev = _last_pasted_text[0]
-    if prev:
-        last = prev[-1]
-        if last.isalnum() or last in ".!?:;,)»\"'":
-            prefix = " "
-
-    final_text = prefix + text
-
-    # Sauvegarder le presse-papier utilisateur avant de l'écraser
-    old_clipboard = None
     try:
-        old_clipboard = pyperclip.paste()
+        if _streaming_label_win[0] is None or not _streaming_label_win[0].winfo_exists():
+            w = tk.Toplevel(root)
+            w.withdraw()
+            w.overrideredirect(True)
+            w.attributes("-topmost", True)
+            w.attributes("-alpha", 0.85)
+            w.configure(bg="#1a1a2e")
+            lbl = tk.Label(
+                w, text=text,
+                bg="#1a1a2e", fg="#e0e0e0",
+                font=("Segoe UI", 20),
+                wraplength=800,
+                padx=12, pady=6,
+                justify="left",
+            )
+            lbl.pack()
+            _streaming_label_win[0] = w
+            _streaming_label_text[0] = lbl
+            w.deiconify()
+        else:
+            _streaming_label_text[0].config(text=text)
+
+        # Positionner sous le curseur (clampé aux bords de l'écran)
+        try:
+            w = _streaming_label_win[0]
+            mx = root.winfo_pointerx()
+            my = root.winfo_pointery()
+            if mx >= 0 and my >= 0:
+                w.update_idletasks()
+                lbl_w = w.winfo_reqwidth()
+                lbl_h = w.winfo_reqheight()
+                sw = root.winfo_screenwidth()
+                sh = root.winfo_screenheight()
+                x_pos = min(mx, sw - lbl_w - 10)
+                y_pos = my + _STREAMING_LABEL_OFFSET_Y
+                if y_pos + lbl_h > sh - 10:
+                    y_pos = my - lbl_h - 10  # au-dessus du curseur si en bas
+                w.geometry(f"+{x_pos}+{y_pos}")
+        except Exception:
+            pass
+    except Exception as e:
+        log_error(e, "streaming label")
+
+
+def _hide_streaming_label():
+    """Cache et détruit le label flottant."""
+    try:
+        if _streaming_label_win[0] is not None:
+            _streaming_label_win[0].destroy()
     except Exception:
         pass
+    _streaming_label_win[0] = None
+    _streaming_label_text[0] = None
 
-    # Copier avec retry si clipboard verrouillé
-    if not fast_copy(final_text):
-        time.sleep(0.05)
-        if not fast_copy(final_text):
-            log_error(msg="[PASTE] Clipboard verrouillé après retry — texte perdu")
-            return
 
-    # Restaurer le focus sur la fenêtre cible avant de coller
-    if _restore_target_focus():
-        # 80ms : minimum empirique pour que Windows traite le changement de focus
-        time.sleep(0.08)
-    else:
-        log_error(msg=f"[PASTE] Focus non restauré (target_hwnd={_target_hwnd[0]})")
-        # Délai standard si pas de fenêtre cible connue
-        if delay > 0:
-            time.sleep(delay)
-    paste_text()
-    _last_pasted_text[0] = text   # mémoriser le texte brut (sans prefix)
-
-    # Restaurer le presse-papier original après collage
-    if old_clipboard is not None:
-        time.sleep(0.08)   # laisser Ctrl+V finir (avant: 150ms — 80ms suffit)
-        # Vérifier que le clipboard contient encore notre texte avant de restaurer ;
-        # si l'utilisateur a copié autre chose entre-temps, ne pas écraser.
+def _update_streaming_label_position():
+    """Met à jour la position du label pour suivre le curseur."""
+    if _streaming_label_win[0] is not None:
         try:
-            current_cb = pyperclip.paste()
+            w = _streaming_label_win[0]
+            if w.winfo_exists():
+                mx = root.winfo_pointerx()
+                my = root.winfo_pointery()
+                if mx >= 0 and my >= 0:
+                    lbl_w = w.winfo_reqwidth()
+                    lbl_h = w.winfo_reqheight()
+                    sw = root.winfo_screenwidth()
+                    sh = root.winfo_screenheight()
+                    x_pos = min(mx, sw - lbl_w - 10)
+                    y_pos = my + _STREAMING_LABEL_OFFSET_Y
+                    if y_pos + lbl_h > sh - 10:
+                        y_pos = my - lbl_h - 10
+                    w.geometry(f"+{x_pos}+{y_pos}")
         except Exception:
-            current_cb = None
-        if current_cb is not None and current_cb == final_text:
-            for _attempt in range(2):
-                try:
-                    pyperclip.copy(old_clipboard)
-                    break
-                except Exception:
-                    time.sleep(0.1)   # clipboard verrouillé — réessayer une fois
+            pass
+    # Re-planifier tant qu'on enregistre
+    if is_recording.is_set() and _streamer.enabled:
+        _streaming_job[0] = root.after(50, _update_streaming_label_position)
+
+
+
+# (clavier / hotkeys → core/hotkeys.py)
+
+
+# (transcription + copier-coller → core/transcription.py)
+
+def transcribe_audio(model, audio_data, use_vad=True):
+    """Wrapper : transcrit via core/transcription.py avec les globals."""
+    return _transcribe_audio_core(
+        model, audio_data, config,
+        device=detected_device, compute=detected_compute, use_vad=use_vad,
+    )
+
+def copy_and_paste(text, delay=PASTE_DELAY):
+    """Wrapper : copie-colle via core/transcription.py avec les globals."""
+    _copy_and_paste_core(
+        text, delay=delay,
+        restore_focus_fn=_restore_target_focus,
+        target_hwnd=_target_hwnd[0],
+    )
 
 # ── Chargement & boucle principale ────────────────────────────────────────
 _global_model = [None]   # modèle Whisper persisté — évite rechargement par watchdog
 
-def _is_model_cached(model_name):
-    """Vérifie si le modèle Whisper est déjà téléchargé en cache HuggingFace."""
-    try:
-        from faster_whisper.utils import _MODELS
-        repo_id = _MODELS.get(model_name, model_name)
-        cache_dir = os.path.join(str(Path.home()), ".cache", "huggingface", "hub")
-        repo_dir = os.path.join(cache_dir, "models--" + repo_id.replace("/", "--"))
-        if not os.path.isdir(repo_dir):
-            return False, repo_dir, 0
-        # Calculer la taille actuelle en cache
-        total = sum(
-            os.path.getsize(os.path.join(dp, f))
-            for dp, _, fnames in os.walk(repo_dir) for f in fnames
-        )
-        # Un modèle complet a au moins model.bin (~75 MB pour tiny)
-        has_model_bin = any(
-            f.endswith("model.bin") for dp, _, fnames in os.walk(repo_dir) for f in fnames
-        )
-        return has_model_bin, repo_dir, total
-    except Exception:
-        return True, "", 0   # en cas d'erreur, on suppose qu'il est en cache
-
-
-# Tailles approximatives des modèles (model.bin + config) en octets
-_MODEL_SIZES = {
-    "tiny": 77_000_000, "base": 148_000_000, "small": 490_000_000,
-    "medium": 1_530_000_000, "large-v2": 3_090_000_000,
-    "large-v3": 3_090_000_000, "large-v3-turbo": 1_620_000_000,
-}
-
-
 def _load_model():
-    """Charge le modèle Whisper avec fallback GPU float16 → CPU int8 et warmup."""
+    """Wrapper : charge le modèle via core/model.py et met à jour les globals."""
     global detected_device, detected_compute
-    model_name = config["model"]
-
-    # ── Progression du téléchargement si le modèle n'est pas en cache ────
-    cached, repo_dir, _ = _is_model_cached(model_name)
-    _dl_stop = threading.Event()
-    if not cached:
-        expected = _MODEL_SIZES.get(model_name, 3_000_000_000)
-        expected_mb = expected / (1024 * 1024)
-
-        def _monitor_download():
-            """Thread qui surveille la taille du dossier cache et met à jour le statut."""
-            while not _dl_stop.is_set():
-                try:
-                    if os.path.isdir(repo_dir):
-                        current = sum(
-                            os.path.getsize(os.path.join(dp, f))
-                            for dp, _, fnames in os.walk(repo_dir) for f in fnames
-                        )
-                        current_mb = current / (1024 * 1024)
-                        pct = min(99, int(current / expected * 100))
-                        set_statut_safe(
-                            f"Telechargement {model_name} : {current_mb:.0f}/{expected_mb:.0f} Mo ({pct}%)",
-                            COLOR_ORANGE, COLOR_ORANGE,
-                        )
-                except Exception:
-                    pass
-                _dl_stop.wait(0.5)
-
-        set_statut_safe(f"Telechargement {model_name}...", COLOR_ORANGE, COLOR_ORANGE)
-        threading.Thread(target=_monitor_download, daemon=True).start()
-
-    # Import lazy de faster_whisper (économise ~1.5s au démarrage)
-    from faster_whisper import WhisperModel
-
-    model = None
-    try:
-        _dev_label = "GPU" if detected_device == "cuda" else "CPU"
-        set_statut_safe(
-            f"Chargement {model_name} ({_dev_label} {detected_compute})...",
-            COLOR_ORANGE, COLOR_ORANGE,
-        )
-        # num_workers=4 : 4 streams parallèles → le CPU prépare les batchs suivants
-        #                  pendant que le GPU traite le batch actuel (pipeline)
-        # cpu_threads=4 : sweet spot prouvé (8 cause thread contention → régression)
-        model = WhisperModel(model_name, device=detected_device, compute_type=detected_compute,
-                             num_workers=4, cpu_threads=4)
-    except Exception as e:
-        log_error(e, f"Impossible de charger le modèle {config['model']} "
-                      f"sur {detected_device}/{detected_compute}")
-        # Fallback CUDA → CPU int8
-        if detected_device == "cuda":
-            try:
-                log_error(msg="Fallback CUDA → CPU")
-                detected_device, detected_compute = "cpu", "int8"
-                model = WhisperModel(config["model"], device="cpu", compute_type="int8")
-            except Exception as e2:
-                log_error(e2, "Fallback CPU aussi échoué")
-        if model is None:
-            for fallback in ["base", "tiny"]:
-                try:
-                    set_statut_safe(tr("fallback", model=fallback), COLOR_ORANGE, COLOR_ORANGE)
-                    detected_device, detected_compute = "cpu", "int8"
-                    model = WhisperModel(fallback, device="cpu", compute_type="int8")
-                    break
-                except Exception:
-                    continue
-    _dl_stop.set()   # arrêter le thread de monitoring téléchargement
-    if model is None:
-        return None
-    # Warmup — 1 seule itération (bruit blanc 0.5s)
-    # Compile les kernels CUDA et chauffe les chemins de calcul réels.
-    # Réduit de 2×1s à 1×0.5s → démarrage ~1.5s plus rapide.
-    _dev_label = "GPU" if detected_device == "cuda" else "CPU"
-    set_statut_safe(f"Initialisation {_dev_label}...", COLOR_ORANGE, COLOR_ORANGE)
-    warmup_ok = False
-    rng = np.random.RandomState(42)
-    dummy = (rng.randn(SAMPLE_RATE // 2) * 0.02).astype(np.float32)  # 0.5s — défini hors try pour le fallback
-    try:
-        list(model.transcribe(dummy, language=config["language"],
-                              without_timestamps=True)[0])
-        log_error(msg=f"[WARMUP] OK ({_dev_label})")
-        warmup_ok = True
-    except Exception as e:
-        log_error(e, f"Warmup {detected_device}/{detected_compute} échoué")
-        if detected_device == "cuda":
-            log_error(msg="Warmup CUDA échoué — fallback CPU")
-            detected_device, detected_compute = "cpu", "int8"
-            set_statut_safe("Initialisation CPU...", COLOR_ORANGE, COLOR_ORANGE)
-            try:
-                model = WhisperModel(config["model"], device="cpu", compute_type="int8",
-                                     num_workers=4, cpu_threads=4)
-                list(model.transcribe(dummy, language=config["language"],
-                                      without_timestamps=True)[0])
-                warmup_ok = True
-            except Exception as e2:
-                log_error(e2, "Warmup CPU aussi échoué")
-                model = None
-    if not warmup_ok:
-        return None
+    model, detected_device, detected_compute = _load_model_core(
+        config, detected_device, detected_compute,
+        on_status=lambda txt: set_statut_safe(txt, COLOR_ORANGE, COLOR_ORANGE),
+    )
     return model
 
 
@@ -3899,8 +3759,11 @@ def _recover_stream_error():
             stream[0].close()
     except Exception:
         pass
-    time.sleep(2)
-    if not _app_closing[0]:
+    # Retry avec backoff (1s, 2s, 3s) au lieu d'un sleep fixe 2s
+    for _attempt in range(3):
+        if _app_closing[0]:
+            return
+        time.sleep(1 + _attempt)
         try:
             new_stream = sd.InputStream(
                 samplerate=SAMPLE_RATE, channels=1,
@@ -3909,10 +3772,11 @@ def _recover_stream_error():
             new_stream.start()
             stream[0] = new_stream
             set_statut_safe(tr("ready", hotkey=_hotkey_label()), COLOR_GREEN, COLOR_GREEN)
+            return
         except Exception as e_restart:
-            log_error(e_restart, "Impossible de relancer le stream audio")
-            stream[0] = None
-            set_statut_safe(tr("mic_error"), COLOR_RED, COLOR_RED)
+            log_error(e_restart, f"Relance audio tentative {_attempt + 1}/3")
+    stream[0] = None
+    set_statut_safe(tr("mic_error"), COLOR_RED, COLOR_RED)
 
 
 def _record_meeting_loop(model):
@@ -3959,8 +3823,8 @@ def _record_meeting_loop(model):
 
         audio = audio_buffer.get_data()
         if mode_libre[0] and not _app_closing[0]:
-            is_recording.set()      # AVANT clear → pas de gap audio
-            audio_buffer.clear()
+            audio_buffer.clear()    # clear D'ABORD (l'ancien segment est dans `audio`)
+            is_recording.set()      # PUIS activer → le callback écrit dans un buffer propre
             set_statut_safe(tr("meeting_on"), COLOR_RED, COLOR_RED)
         else:
             is_recording.clear()
@@ -3985,10 +3849,38 @@ def _record_meeting_loop(model):
 
 
 def _record_ptt(model, hotkey):
-    """Enregistre et transcrit un segment push-to-talk."""
+    """Enregistre et transcrit un segment push-to-talk.
+
+    Si le streaming est activé, transcrit périodiquement avec le modèle tiny
+    et affiche un aperçu dans un label flottant sous le curseur.
+    La transcription finale (au relâchement) utilise toujours le modèle principal.
+    """
     _hold_start = time.perf_counter()
+    _last_stream_time = time.perf_counter()
+    _streaming_active = _streamer.enabled and _streamer.is_ready
+
+    # Démarrer le suivi du curseur pour le label flottant
+    if _streaming_active:
+        _streamer.reset()
+        _safe_after(0, _update_streaming_label_position)
+
     while is_hotkey_pressed(hotkey) and not _app_closing[0]:
+        # ── Streaming périodique : transcrire un aperçu toutes les ~1.5s ──
+        if _streaming_active:
+            _now = time.perf_counter()
+            if (_now - _last_stream_time) >= (_STREAMING_INTERVAL_MS / 1000.0):
+                _last_stream_time = _now
+                _audio_snap = audio_buffer.get_data()
+                if _audio_snap.size > 0:
+                    _preview = _streamer.transcribe_chunk(_audio_snap)
+                    if _preview:
+                        _safe_after(0, lambda t=_preview: _show_streaming_label(t))
         time.sleep(POLL_INTERVAL)
+
+    # ── Cacher le label streaming dès le relâchement ──
+    if _streaming_active:
+        _safe_after(0, _hide_streaming_label)
+
     if not _app_closing[0]:
         _hold_ms = (time.perf_counter() - _hold_start) * 1000
         audio = audio_buffer.get_data()
@@ -4017,7 +3909,12 @@ def chargement():
 
     # Détection GPU (déplacée ici pour accélérer le démarrage de ~0.5s)
     if detected_device == "auto":
-        detected_device, detected_compute, hw_info = init_device()
+        try:
+            detected_device, detected_compute, hw_info = init_device()
+        except Exception as e:
+            log_error(e, "init_device échoué — fallback CPU")
+            detected_device, detected_compute = "cpu", "int8"
+            hw_info = "CPU (détection échouée)"
         # Mettre à jour le label hardware dans l'UI
         try:
             _safe_after(0, lambda: hw_label.config(text=hw_info))
@@ -4047,6 +3944,12 @@ def chargement():
             set_statut_safe(tr("model_error"), COLOR_RED, COLOR_RED)
             return
         _global_model[0] = model
+
+    # ── Charger le modèle streaming tiny en arrière-plan ──
+    if _streamer.enabled:
+        _streamer.set_language(config["language"])
+        _streamer.load_async()
+        log_error(msg="[STREAMING] Chargement du modèle tiny en arrière-plan...")
 
     # Afficher le device effectif dans le premier statut "Prêt" (diagnostic perf)
     _dev_tag = "GPU" if detected_device == "cuda" else "CPU"
@@ -4089,9 +3992,13 @@ def chargement():
             try:
                 # Démarrer l'enregistrement IMMÉDIATEMENT — GUI après
                 audio_buffer.clear()
-                # Injecter le pré-buffer (~0.5s d'audio avant l'appui)
+                # Injecter le pré-buffer — UNIQUEMENT les blocs avec de la voix
+                # (après inactivité, le pré-buffer contient du silence → on l'écarte)
                 for _chunk in _pre_buffer:
-                    audio_buffer.append(_chunk)
+                    _flat = _chunk.ravel()
+                    _rms = (np.dot(_flat, _flat) / _flat.size) ** 0.5
+                    if _rms > VAD_THRESHOLD:
+                        audio_buffer.append(_chunk)
                 _pre_buffer.clear()
                 is_recording.set()
                 set_statut_safe(tr("recording"), COLOR_RED, COLOR_RED)

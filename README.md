@@ -1,8 +1,8 @@
-# 🎤 Whisper Hélio v1.4b
+# 🎤 Whisper Hélio v1.5
 
 **Dictée vocale Windows — 100% offline, 100% gratuit**
 
-![Version](https://img.shields.io/badge/version-1.4b-green.svg)
+![Version](https://img.shields.io/badge/version-1.5-green.svg)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)]()
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)]()
@@ -38,7 +38,21 @@
 
 ---
 
-## 🆕 Nouveautés v1.4b
+## 🆕 Nouveautés v1.5
+
+### 🎤 Streaming temps réel
+- **Aperçu en direct** pendant la dictée — un label flottant affiche le texte en quasi-temps-réel sous le curseur
+- **Double modèle** : `tiny` (aperçu rapide) + modèle principal (transcription finale de qualité)
+- Activable/désactivable dans les Paramètres
+- Aucun impact sur la qualité finale
+
+### 📤 Export multi-format
+- **5 formats** : SRT, VTT, TXT horodaté, TXT brut, JSON
+- Export après transcription de fichier audio
+- Anti-écrasement automatique (suffixes _2, _3...)
+- Encodage UTF-8 BOM pour compatibilité Windows (accents français)
+
+### 🆕 Nouveautés v1.4b
 
 ### 📂 Transcription de fichiers audio
 - **Drag-and-drop** : glissez un fichier audio sur la fenêtre pour le transcrire
@@ -307,15 +321,17 @@ Cliquez sur le bouton 📂 dans l'interface pour parcourir et sélectionner un f
 ## 🏗️ Architecture technique
 
 ```
-Whisper Hélio v1.4b
+Whisper Hélio v1.5
 │
 ├── Thread principal (Tkinter)
 │   ├── Interface utilisateur
 │   ├── VU-mètre animé (30 fps)
+│   ├── Label streaming flottant (aperçu temps réel)
 │   └── Gestion des événements
 │
 ├── Thread chargement
-│   ├── Chargement modèle Whisper
+│   ├── Chargement modèle Whisper (large-v3)
+│   ├── Chargement modèle streaming (tiny, CPU)
 │   ├── Boucle d'enregistrement
 │   └── Transcription (BatchedInferencePipeline GPU)
 │
@@ -335,6 +351,12 @@ Whisper Hélio v1.4b
 ---
 
 ## 📄 Changelog
+
+### v1.5 (Mars 2026)
+- Streaming temps réel (aperçu pendant la dictée, double modèle tiny + principal)
+- Export multi-format (SRT, VTT, TXT horodaté, TXT brut, JSON)
+- Interface française : tous les accents restaurés (30+ corrections)
+- 6 corrections d'audit (upx_exclude, guards audio, log_error)
 
 ### v1.4b (Mars 2026)
 - Transcription fichiers audio (drag-and-drop + bouton 📂)
