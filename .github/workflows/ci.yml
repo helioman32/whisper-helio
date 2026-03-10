@@ -1,0 +1,53 @@
+name: CI — Whisper Hélio
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    name: Lint + Tests (Python ${{ matrix.python-version }})
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Verify syntax (py_compile)
+        run: |
+          python -m py_compile dictee.pyw
+          python -m py_compile core/config.py
+          python -m py_compile core/audio.py
+          python -m py_compile core/system.py
+          python -m py_compile core/export.py
+          python -m py_compile core/streaming.py
+          python -m py_compile core/macros.py
+          python -m py_compile core/hotkeys.py
+          python -m py_compile core/model.py
+          python -m py_compile core/transcription.py
+          python -m py_compile i18n/translations.py
+          python -m py_compile ui/__init__.py
+          python -m py_compile ui/helpers.py
+          python -m py_compile ui/winapi.py
+          python -m py_compile ui/dialogs.py
+          python -m py_compile ui/file_transcribe.py
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short
