@@ -3433,16 +3433,21 @@ def vram_cleanup() -> None:
     ne tourne PENDANT une inférence CUDA (cause de Fatal Python error: Aborted).
     """
     _has_torch = False
-    try:
-        import torch
-        _has_torch = torch.cuda.is_available()
-    except Exception:
-        pass
+    _torch_checked = False
 
     while not _app_closing[0]:
         time.sleep(300)  # 5 minutes
         if detected_device != "cuda":
             continue   # device a peut-être basculé CPU (fallback) → skip
+        # Import torch au premier besoin (pas au démarrage — race condition
+        # avec chargement() qui importe ctranslate2 simultanément → crash)
+        if not _torch_checked:
+            _torch_checked = True
+            try:
+                import torch
+                _has_torch = torch.cuda.is_available()
+            except Exception:
+                pass
         # Acquérir le verrou transcription → évite gc.collect pendant l'inférence
         # (gc.collect ignore gc.disable() et peut corrompre l'état CUDA)
         if not _recording_lock.acquire(timeout=2):
@@ -3454,6 +3459,7 @@ def vram_cleanup() -> None:
             try:
                 gc.collect()   # libère les objets CUDA orphelins (fonctionne toujours)
                 if _has_torch:
+                    import torch
                     torch.cuda.empty_cache()
             finally:
                 _file_transcribing.release()
