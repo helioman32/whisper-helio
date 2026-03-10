@@ -352,11 +352,11 @@ ui.init(
 _tooltip_win = [None]   # fenêtre tooltip active (Toplevel ou None)
 _tooltip_job = [None]   # after() id pour le délai d'apparition
 
-def _tooltip_bind(widget, tr_key):
+def _tooltip_bind(widget, tr_key) -> None:
     """Ajoute un tooltip traduit à un widget (apparaît après 500ms au survol)."""
-    def _show(e):
+    def _show(e) -> None:
         _tooltip_cancel()
-        def _display():
+        def _display() -> None:
             if _app_closing[0]:
                 return
             tw = tk.Toplevel(widget)
@@ -376,14 +376,14 @@ def _tooltip_bind(widget, tr_key):
             _tooltip_win[0] = tw
         _tooltip_job[0] = widget.after(500, _display)
 
-    def _hide(e):
+    def _hide(e) -> None:
         _tooltip_cancel()
 
     widget.bind("<Enter>", _show, add="+")
     widget.bind("<Leave>", _hide, add="+")
     widget.bind("<Button-1>", _hide, add="+")
 
-def _tooltip_cancel():
+def _tooltip_cancel() -> None:
     """Annule le timer et détruit le tooltip s'il existe."""
     if _tooltip_job[0]:
         try:
@@ -510,7 +510,7 @@ def get_start_pos(w: int, h: int, sw: int, sh: int, position: str) -> tuple[int,
 
 # ── Filet Tkinter — capture exceptions dans les callbacks after()/bind() ──
 # Par défaut Tkinter les imprime sur stderr (invisible dans l'exe sans console).
-def _tk_exception_handler(exc_type, exc_value, exc_tb):
+def _tk_exception_handler(exc_type, exc_value, exc_tb) -> None:
     log_exception(exc_type, exc_value, exc_tb)
 root.report_callback_exception = _tk_exception_handler
 
@@ -572,7 +572,7 @@ def minimize_to_taskbar() -> None:
     # un bouton taskbar. DÉCLENCHE <Map> mais _minimizing le bloque.
     root.overrideredirect(False)
 
-    def _do_iconify():
+    def _do_iconify() -> None:
         """Appelé 50ms après overrideredirect(False) — events Tkinter vidés."""
         if _app_closing[0]:
             return
@@ -600,7 +600,7 @@ def minimize_to_taskbar() -> None:
         root.iconify()
 
         # Double application après iconify (certains Windows la réinitialisent)
-        def _reinforce_icon():
+        def _reinforce_icon() -> None:
             if _app_closing[0]:
                 return
             _root_hwnd[0] = None   # re-invalider — iconify peut changer le handle
@@ -612,7 +612,7 @@ def minimize_to_taskbar() -> None:
 
     root.after(50, _do_iconify)
 
-def restore_from_taskbar(event=None):
+def restore_from_taskbar(event=None) -> None:
     """Restaure root depuis la taskbar — appelé par <Map>."""
     # Bloquer pendant la séquence de minimisation ou la fermeture
     if _app_closing[0] or _minimizing[0] or not _minimized[0]:
@@ -744,7 +744,7 @@ def on_close() -> None:
             pass
 
     # Filet de sécurité : si le nettoyage bloque >3s, forcer la sortie
-    def _force_exit():
+    def _force_exit() -> None:
         time.sleep(3)
         os._exit(0)
     threading.Thread(target=_force_exit, daemon=True).start()
@@ -777,7 +777,7 @@ def on_close() -> None:
     os._exit(0)
 
 # Gestion Ctrl+C
-def signal_handler(sig, frame):
+def signal_handler(sig, frame) -> None:
     """Gère le signal SIGINT (Ctrl+C) — schedule on_close dans le mainloop.
     NE PAS mettre _app_closing=True ici : on_close() le fait lui-même,
     et le mettre avant empêcherait on_close() de faire le cleanup.
@@ -832,7 +832,7 @@ def set_cursor(cursor: str) -> None:
 # Set pour les boutons (sera rempli après création)
 _button_canvases = set()
 
-def on_motion(e):
+def on_motion(e) -> None:
     """Gère le mouvement de la souris pour le curseur."""
     if e.widget in _button_canvases:
         set_cursor("hand2")
@@ -847,7 +847,7 @@ def on_motion(e):
 _last_click_time   = [0]
 _last_click_widget = [None]
 
-def on_press(e):
+def on_press(e) -> None:
     """Gère le clic pour le redimensionnement/déplacement."""
     # Laisser passer le double-clic (deux clics < 400ms sur même widget)
     now = time.time()
@@ -880,7 +880,7 @@ def on_press(e):
 
 _last_geometry_time = [0]
 
-def on_drag(e):
+def on_drag(e) -> None:
     """Gère le drag pour redimensionner/déplacer."""
     if e.widget in _button_canvases:
         return
@@ -945,10 +945,10 @@ btn_help_txt = btn_help.create_text(14, 14, text="?",
                                     fill=theme()["btn_fg"],
                                     font=("Segoe UI", 11, "bold"))
 
-def on_help_enter(e):
+def on_help_enter(e) -> None:
     btn_help.itemconfig(btn_help_bg, fill=COLOR_BLUE)
     btn_help.itemconfig(btn_help_txt, fill=COLOR_WHITE)
-def on_help_leave(e):
+def on_help_leave(e) -> None:
     btn_help.itemconfig(btn_help_bg, fill=theme().get("btn_icon_bg", "#2a2a3e"))
     btn_help.itemconfig(btn_help_txt, fill=theme()["btn_fg"])
 btn_help.bind("<Enter>", on_help_enter)
@@ -993,9 +993,9 @@ btn_reunion.pack(side="left", padx=(0, 3))
 btn_reunion_bg  = btn_reunion.create_oval(2, 2, 24, 24, fill=COLOR_GREEN, outline="")
 btn_reunion_txt = btn_reunion.create_text(13, 13, text="⏺", fill=COLOR_WHITE, font=("Segoe UI", 9))
 
-def on_reunion_enter(e):
+def on_reunion_enter(e) -> None:
     btn_reunion.itemconfig(btn_reunion_bg, fill=COLOR_RED if mode_libre[0] else COLOR_GREEN_HOVER)
-def on_reunion_leave(e):
+def on_reunion_leave(e) -> None:
     btn_reunion.itemconfig(btn_reunion_bg, fill=COLOR_RED if mode_libre[0] else COLOR_GREEN)
 btn_reunion.bind("<Button-1>", lambda e: toggle_libre())
 btn_reunion.bind("<Enter>",    on_reunion_enter)
@@ -1007,22 +1007,22 @@ btn_libre.pack(side="left", padx=3)
 btn_libre_bg  = btn_libre.create_oval(2, 2, 30, 30, fill=theme().get("btn_icon_bg","#2a2a3e"), outline="")
 btn_libre_txt = btn_libre.create_text(16, 16, text="🎙", fill=COLOR_WHITE, font=("Segoe UI", 11))
 
-def on_libre_enter(e):
+def on_libre_enter(e) -> None:
     t = theme()
     btn_libre.itemconfig(btn_libre_bg, fill=t.get("vu_color","#22d3ee"))
     btn_libre.itemconfig(btn_libre_txt, fill=t.get("footer_btn_fg","#0a0a14"))
-def on_libre_leave(e):
+def on_libre_leave(e) -> None:
     t = theme()
     btn_libre.itemconfig(btn_libre_bg, fill=t.get("btn_icon_bg","#2a2a3e"))
     btn_libre.itemconfig(btn_libre_txt, fill=COLOR_WHITE)
-def on_libre_click(e):
+def on_libre_click(e) -> None:
     root.after(0, open_macros)
 btn_libre.bind("<Button-1>", on_libre_click)
 btn_libre.bind("<Enter>", on_libre_enter)
 btn_libre.bind("<Leave>", on_libre_leave)
 
 # ── 3. ⚙ Bouton Paramètres — engrenage dessiné ───────────────────────────
-def _draw_gear(canvas, cx, cy, color):
+def _draw_gear(canvas, cx, cy, color) -> list[int]:
     """Dessine un engrenage 8 dents sur le canvas. Retourne les IDs."""
     ids = []
     R_outer, R_inner, R_hole, N_teeth = 8.5, 6.2, 2.8, 8
@@ -1042,16 +1042,16 @@ btn_settings_bg  = btn_settings.create_oval(2, 2, 30, 30, fill=theme().get("btn_
 _gear_color = theme()["btn_fg"]
 _gear_ids   = _draw_gear(btn_settings, 16, 16, _gear_color)
 
-def _recolor_gear(color):
+def _recolor_gear(color) -> None:
     """Change la couleur de l'engrenage sans recréer les items (plus efficace)."""
     if len(_gear_ids) >= 2:
         btn_settings.itemconfig(_gear_ids[0], fill=color)       # polygon (corps)
         btn_settings.itemconfig(_gear_ids[1], outline=color)    # oval (trou central)
 
-def on_settings_enter(e):
+def on_settings_enter(e) -> None:
     btn_settings.itemconfig(btn_settings_bg, fill=COLOR_PURPLE)
     _recolor_gear(COLOR_WHITE)
-def on_settings_leave(e):
+def on_settings_leave(e) -> None:
     btn_settings.itemconfig(btn_settings_bg, fill=theme().get("btn_icon_bg","#2a2a3e"))
     _recolor_gear(theme()["btn_fg"])
 btn_settings.bind("<Enter>", on_settings_enter)
@@ -1063,10 +1063,10 @@ btn_file.pack(side="left", padx=3)
 btn_file_bg  = btn_file.create_oval(2, 2, 30, 30, fill=theme().get("btn_icon_bg", "#2a2a3e"), outline="")
 btn_file_txt = btn_file.create_text(16, 16, text="\U0001F4C2", fill=theme()["btn_fg"], font=("Segoe UI", 11))
 
-def on_file_enter(e):
+def on_file_enter(e) -> None:
     btn_file.itemconfig(btn_file_bg, fill=COLOR_BLUE)
     btn_file.itemconfig(btn_file_txt, fill=COLOR_WHITE)
-def on_file_leave(e):
+def on_file_leave(e) -> None:
     btn_file.itemconfig(btn_file_bg, fill=theme().get("btn_icon_bg", "#2a2a3e"))
     btn_file.itemconfig(btn_file_txt, fill=theme()["btn_fg"])
 btn_file.bind("<Button-1>", lambda e: open_file_transcribe())
@@ -1079,17 +1079,17 @@ btn_minimize.pack(side="left", padx=(10, 2))
 btn_minimize_bg  = btn_minimize.create_oval(1, 1, 21, 21, fill=theme().get("btn_icon_bg","#2a2a3e"), outline="")
 btn_minimize_txt = btn_minimize.create_text(11, 11, text="−", fill=theme()["btn_fg"], font=("Segoe UI", 10, "bold"))
 
-def on_minimize_enter(e):
+def on_minimize_enter(e) -> None:
     btn_minimize.itemconfig(btn_minimize_bg, fill="#b45309")
     btn_minimize.itemconfig(btn_minimize_txt, fill=COLOR_WHITE)
-def on_minimize_leave(e):
+def on_minimize_leave(e) -> None:
     btn_minimize.itemconfig(btn_minimize_bg, fill=theme().get("btn_icon_bg","#2a2a3e"))
     btn_minimize.itemconfig(btn_minimize_txt, fill=theme()["btn_fg"])
 _compact_mode = [False]
 _full_height   = [None]
 _full_width    = [None]
 
-def toggle_compact(event=None):
+def toggle_compact(event=None) -> None:
     """Bascule entre mode compact (vu-metre seul, 70px) et mode normal."""
     if _app_closing[0]:
         return
@@ -1148,10 +1148,10 @@ btn_fermer.pack(side="left", padx=(2, 0))
 btn_fermer_bg  = btn_fermer.create_oval(1, 1, 21, 21, fill=theme().get("btn_icon_bg","#2a2a3e"), outline="")
 btn_fermer_txt = btn_fermer.create_text(11, 11, text="✕", fill=theme()["btn_fg"], font=("Segoe UI", 8, "bold"))
 
-def on_fermer_enter(e):
+def on_fermer_enter(e) -> None:
     btn_fermer.itemconfig(btn_fermer_bg, fill=COLOR_RED_DARK)
     btn_fermer.itemconfig(btn_fermer_txt, fill=COLOR_WHITE)
-def on_fermer_leave(e):
+def on_fermer_leave(e) -> None:
     btn_fermer.itemconfig(btn_fermer_bg, fill=theme().get("btn_icon_bg","#2a2a3e"))
     btn_fermer.itemconfig(btn_fermer_txt, fill=theme()["btn_fg"])
 btn_fermer.bind("<Button-1>", lambda e: on_close())
@@ -1221,7 +1221,7 @@ vu_width = [saved_w]
 vu_height = [VU_HEIGHT]   # cache hauteur — évite winfo_height() à chaque frame
 
 # Pré-calcul du profil bell (constant)
-def bell(i, n):
+def bell(i, n) -> float:
     """Calcule le profil en cloche pour le VU-mètre."""
     x = (i - n / 2) / (n / 2)
     return math.exp(-x * x * 2.0)
@@ -1236,7 +1236,7 @@ SIN_TABLE = [math.sin(i * 2 * math.pi / SIN_TABLE_SIZE) for i in range(SIN_TABLE
 _BAR_TAGS = tuple(f"bar_{i}" for i in range(NB_BARRES))
 _WAVE_MOD = 2 * math.pi * 1000
 
-def fast_sin(x):
+def fast_sin(x) -> float:
     """Sinus rapide via table pré-calculée."""
     return SIN_TABLE[int(x * 40.74) & (SIN_TABLE_SIZE - 1)]
 
@@ -1248,7 +1248,7 @@ vu_bar_tops = []
 vu_bar_bottoms = []
 _vu_last_color = [None]   # cache couleur — évite 84 itemconfig inutiles à 30fps
 
-def _reset_vu_objects():
+def _reset_vu_objects() -> None:
     """Reinitialise le VU-metre (supprime tous les objets canvas)."""
     vu_objects_created[0] = False
     vu_bg_objects.clear()
@@ -1258,7 +1258,7 @@ def _reset_vu_objects():
     vu_canvas.delete("all")
     _vu_last_color[0] = None
 
-def create_vu_objects():
+def create_vu_objects() -> None:
     """Crée les objets du VU-mètre — ovale de fond + barres cyan dedans."""
     if vu_objects_created[0]:
         return
@@ -1312,7 +1312,7 @@ def create_vu_objects():
     _vu_last_color[0] = None
     vu_objects_created[0] = True
 
-def update_vu_objects():
+def update_vu_objects() -> None:
     """Met à jour les positions et couleurs du VU-mètre (pleine largeur)."""
     if not vu_objects_created[0]:
         create_vu_objects()
@@ -1363,7 +1363,7 @@ def update_vu_objects():
 
 _vu_configure_job = [None]   # debounce pour on_vu_configure
 
-def on_vu_configure(e):
+def on_vu_configure(e) -> None:
     """Met à jour la largeur/hauteur du VU-mètre (debounced 80ms)."""
     _changed = False
     if e.width > 10 and e.width != vu_width[0]:
@@ -1380,7 +1380,7 @@ def on_vu_configure(e):
                 vu_canvas.after_cancel(_vu_configure_job[0])
             except Exception:
                 pass
-        def _do_vu_reconfigure():
+        def _do_vu_reconfigure() -> None:
             _vu_configure_job[0] = None
             if vu_objects_created[0]:
                 _reset_vu_objects()
@@ -1388,7 +1388,7 @@ def on_vu_configure(e):
 
 vu_canvas.bind("<Configure>", on_vu_configure)
 
-def update_vu():
+def update_vu() -> None:
     """Boucle d'animation du VU-mètre."""
     if _app_closing[0]:
         return
@@ -1425,13 +1425,13 @@ texte_label.pack(fill="both", expand=True, padx=10, pady=(4, 0))
 
 _wraplength_job = [None]
 
-def update_wraplength(event=None):
+def update_wraplength(event=None) -> None:
     """Ajuste le wraplength et la taille de police dynamiquement (debounce 100ms)."""
     if _app_closing[0]:
         return
     if _wraplength_job[0]:
         root.after_cancel(_wraplength_job[0])
-    def _apply():
+    def _apply() -> None:
         w = root.winfo_width()
         new_width = w - 40
         texte_label.config(wraplength=max(200, new_width))
@@ -1460,7 +1460,7 @@ bottom_container.pack(fill="x")
 frame_links = tk.Frame(bottom_container, bg=theme()["bg"])
 frame_links.pack(side="left")
 
-def open_donation(e):
+def open_donation(e) -> None:
     """Ouvre le lien PayPal."""
     webbrowser.open(PAYPAL_URL)
 
@@ -1471,9 +1471,9 @@ donation_label.pack(side="left")
 donation_label.bind("<Button-1>", open_donation)
 donation_label._is_clickable = True
 
-def _don_enter(e):
+def _don_enter(e) -> None:
     donation_label.config(fg=COLOR_BLUE)
-def _don_leave(e):
+def _don_leave(e) -> None:
     donation_label.config(fg=theme()["link"])
 donation_label.bind("<Enter>", _don_enter)
 donation_label.bind("<Leave>", _don_leave)
@@ -1494,8 +1494,8 @@ site_label.bind("<Button-1>", lambda e: webbrowser.open(SITE_URL))
 site_label._is_clickable = True
 
 _SITE_COLOR = "#f1c40f" if config["theme"] == "dark" else "#b8860b"
-def _site_enter(e): site_label.config(fg=COLOR_BLUE)
-def _site_leave(e): site_label.config(fg=_SITE_COLOR)
+def _site_enter(e) -> None: site_label.config(fg=COLOR_BLUE)
+def _site_leave(e) -> None: site_label.config(fg=_SITE_COLOR)
 site_label.bind("<Enter>", _site_enter)
 site_label.bind("<Leave>", _site_leave)
 
@@ -1617,7 +1617,7 @@ def open_settings() -> None:
     """Ouvre la fenetre des parametres (-> ui.dialogs.open_settings)."""
     from ui.dialogs import open_settings as _open_settings_ui
 
-    def _on_save(new_settings, streaming_enabled):
+    def _on_save(new_settings: dict, streaming_enabled: bool) -> None:
         """Callback : applique les settings et met a jour l'UI."""
         for key, val in new_settings.items():
             config[key] = val
@@ -1657,7 +1657,7 @@ _AUDIO_EXT_SET = {e.replace("*", "") for e in _AUDIO_EXTENSIONS}
 
 # ── Drag-and-drop fichiers audio (tkinterdnd2) ───────────────────────────
 
-def _setup_drag_drop():
+def _setup_drag_drop() -> None:
     """Active le drag-and-drop de fichiers audio via tkinterdnd2.
 
     tkinterdnd2 charge l'extension Tcl 'tkdnd' au niveau C — le drop est
@@ -1673,7 +1673,7 @@ def _setup_drag_drop():
         pass  # Drag-drop non disponible — pas critique
 
 
-def _on_tkdnd_drop(event):
+def _on_tkdnd_drop(event) -> None:
     """Callback tkinterdnd2 — recoit le chemin du fichier depose."""
     if _app_closing[0]:
         return
@@ -1699,7 +1699,7 @@ def _on_tkdnd_drop(event):
     _handle_dropped_file(filepath)
 
 
-def _handle_dropped_file(filepath):
+def _handle_dropped_file(filepath: str) -> None:
     """Traite un fichier depose par drag-and-drop sur la fenetre."""
     if _app_closing[0]:
         return
@@ -2049,7 +2049,7 @@ def _show_file_result(filename: str, text: str) -> None:
 
     _copy_feedback_job = [None]   # timer "Copié!" → annulé à la fermeture
 
-    def on_close_file():
+    def on_close_file() -> None:
         _file_transcribe_window[0] = None   # déréférencer AVANT destroy
         if _copy_feedback_job[0]:
             try: win.after_cancel(_copy_feedback_job[0])
@@ -2080,9 +2080,9 @@ def _show_file_result(filename: str, text: str) -> None:
              fg=t.get("fg_title", fg), font=("Segoe UI", 13, "bold"),
              anchor="w").pack(side="left", fill="x", expand=True)
 
-    def _cls_f_enter(e):
+    def _cls_f_enter(e) -> None:
         _btn_cls_f.itemconfig(_cls_bg_f, fill=COLOR_RED_DARK)
-    def _cls_f_leave(e):
+    def _cls_f_leave(e) -> None:
         _btn_cls_f.itemconfig(_cls_bg_f, fill=COLOR_RED)
     _btn_cls_f.bind("<Enter>",    _cls_f_enter)
     _btn_cls_f.bind("<Leave>",    _cls_f_leave)
@@ -2134,7 +2134,7 @@ def _show_file_result(filename: str, text: str) -> None:
         pack_opts={"side": "left", "padx": (0, 10)},
     )
 
-    def _do_copy(e=None):
+    def _do_copy(e=None) -> None:
         content = text_widget.get("1.0", "end-1c")
         if content:
             try:
@@ -2193,7 +2193,7 @@ def _open_folder(path: str) -> None:
         pass   # pas critique
 
 
-def _show_export_dialog(parent_win):
+def _show_export_dialog(parent_win) -> None:
     """
     Affiche la fenêtre de sélection des formats d'export.
 
@@ -2247,7 +2247,7 @@ def _show_export_dialog(parent_win):
     tk.Label(dest_frame, text=tr("export_folder"),
              font=("Segoe UI", 9), fg=fg2, bg=bg).pack(side="left")
 
-    def _short(path):
+    def _short(path: str) -> str:
         return path if len(path) <= 40 else "…" + path[-37:]
 
     dest_lbl = tk.Label(dest_frame, text=_short(_dest_dir[0]),
@@ -2256,7 +2256,7 @@ def _show_export_dialog(parent_win):
     dest_lbl.pack(side="left", padx=(4, 0))
     dest_lbl.bind("<Button-1>", lambda e: _open_folder(_dest_dir[0]))
 
-    def _browse_dest():
+    def _browse_dest() -> None:
         dlg.attributes("-topmost", False)
         try:
             chosen = filedialog.askdirectory(
@@ -2325,7 +2325,7 @@ def _show_export_dialog(parent_win):
     # Bouton "Exporter" — pill vert
     _export_done = [False]   # empêche le double-clic
 
-    def _do_export_action(e=None):
+    def _do_export_action(e=None) -> None:
         if _export_done[0]:
             return
         selected = [k for k, v in format_vars.items() if v.get()]
@@ -2402,7 +2402,7 @@ ui.init(copy_and_paste=copy_and_paste)
 
 # ── Builders d'onglets pour open_macros() ────────────────────────────────
 
-def _build_macros_tab(notebook, win, t):
+def _build_macros_tab(notebook, win, t) -> list:
     """Construit l'onglet Macros texte. Retourne macro_rows."""
     bg  = t["bg"]
     fg2 = t["fg2"]
@@ -2437,7 +2437,7 @@ def _build_macros_tab(notebook, win, t):
     macro_rows = []
     _entry_w = max(8, int(13 * _SCALE))
 
-    def add_macro_row(name="", text=""):
+    def add_macro_row(name: str = "", text: str = "") -> None:
         row = tk.Frame(if_m, bg=bg)
         row.pack(fill="x", pady=2)
         vn = tk.StringVar(win, value=name)
@@ -2451,7 +2451,7 @@ def _build_macros_tab(notebook, win, t):
                       insertbackground=_ifg, relief="flat", bd=4)
         et.pack(side="left", fill="x", expand=True, padx=(6, 6))
 
-        def del_m():
+        def del_m() -> None:
             try: macro_rows.remove((vn, vt))
             except ValueError: pass
             row.destroy()
@@ -2467,7 +2467,7 @@ def _build_macros_tab(notebook, win, t):
     for m in config.get("macros", []):
         add_macro_row(m.get("name", ""), m.get("text", ""))
 
-    def on_add_macro():
+    def on_add_macro() -> None:
         add_macro_row()
         win.after(50, lambda: cs_m.yview_moveto(1.0))
 
@@ -2475,7 +2475,7 @@ def _build_macros_tab(notebook, win, t):
     return macro_rows
 
 
-def _build_actions_tab(notebook, win, t):
+def _build_actions_tab(notebook, win, t) -> tuple:
     """Construit l'onglet Actions vocales. Retourne (v_action_trigger, action_rows)."""
     bg  = t["bg"]
     fg  = t["fg"]
@@ -2559,7 +2559,7 @@ def _build_actions_tab(notebook, win, t):
 
     _fa_sb_visible = [False]
 
-    def _fa_on_inner_configure(e):
+    def _fa_on_inner_configure(e) -> None:
         cs_a.configure(scrollregion=cs_a.bbox("all"))
         need_sb = if_a.winfo_reqheight() > cs_a.winfo_height()
         if need_sb and not _fa_sb_visible[0]:
@@ -2569,7 +2569,7 @@ def _build_actions_tab(notebook, win, t):
             _fa_sb.pack_forget()
             _fa_sb_visible[0] = False
 
-    def _fa_on_canvas_configure(e):
+    def _fa_on_canvas_configure(e) -> None:
         cs_a.itemconfig(_fa_win, width=e.width)
 
     if_a.bind("<Configure>", _fa_on_inner_configure)
@@ -2577,7 +2577,7 @@ def _build_actions_tab(notebook, win, t):
     cs_a.pack(side="left", fill="both", expand=True)
 
     _mw_a_accum = [0.0]
-    def _mw_a(e):
+    def _mw_a(e) -> None:
         _mw_a_accum[0] += -e.delta / 120.0
         lines = int(_mw_a_accum[0])
         if lines:
@@ -2587,7 +2587,7 @@ def _build_actions_tab(notebook, win, t):
     action_rows = []
     _entry_w = max(8, int(13 * _SCALE))
 
-    def add_action_row(name="", path=""):
+    def add_action_row(name: str = "", path: str = "") -> None:
         row = tk.Frame(if_a, bg=bg)
         row.pack(fill="x", pady=2)
         vn = tk.StringVar(win, value=name)
@@ -2603,7 +2603,7 @@ def _build_actions_tab(notebook, win, t):
                       insertbackground=_ifg, relief="flat", bd=4)
         ep.pack(side="left", fill="x", expand=True, padx=(6, 4))
 
-        def browse():
+        def browse() -> None:
             win.attributes("-topmost", False)
             try:
                 f = filedialog.askopenfilename(
@@ -2620,7 +2620,7 @@ def _build_actions_tab(notebook, win, t):
                   bg=COLOR_BLUE_DARK, fg="white", relief="flat",
                   font=("Consolas", 14), cursor="hand2", padx=5).pack(side="left")
 
-        def del_a():
+        def del_a() -> None:
             try: action_rows.remove((vn, vp))
             except ValueError: pass
             row.destroy()
@@ -2636,7 +2636,7 @@ def _build_actions_tab(notebook, win, t):
     for a in config.get("actions", []):
         add_action_row(a.get("name", ""), a.get("path", ""))
 
-    def on_add_action():
+    def on_add_action() -> None:
         add_action_row()
         win.after(50, lambda: cs_a.yview_moveto(1.0))
 
@@ -2644,7 +2644,7 @@ def _build_actions_tab(notebook, win, t):
     return v_action_trigger, action_rows
 
 
-def _build_dict_tab(notebook, win, t):
+def _build_dict_tab(notebook, win, t) -> list:
     """Construit l'onglet Dictionnaire. Retourne dict_rows."""
     bg  = t["bg"]
     fg2 = t["fg2"]
@@ -2684,7 +2684,7 @@ def _build_dict_tab(notebook, win, t):
 
     dict_rows = []
 
-    def add_dict_row(wrong="", correct=""):
+    def add_dict_row(wrong: str = "", correct: str = "") -> None:
         _row_even_bg = _ibg
         _row_odd_bg  = accent
         row_bg = _row_even_bg if len(dict_rows) % 2 == 0 else _row_odd_bg
@@ -2703,7 +2703,7 @@ def _build_dict_tab(notebook, win, t):
         tk.Label(row, text="→", bg=row_bg, fg=COLOR_ORANGE,
                  font=("Consolas", 10, "bold")).pack(side="left", padx=(4, 4))
 
-        def del_d():
+        def del_d() -> None:
             try: dict_rows.remove((vw, v_cor))
             except ValueError: pass
             row.destroy()
@@ -2725,7 +2725,7 @@ def _build_dict_tab(notebook, win, t):
     for d in config.get("dictionary", []):
         add_dict_row(d.get("wrong", ""), d.get("correct", ""))
 
-    def on_add_dict():
+    def on_add_dict() -> None:
         add_dict_row()
         win.after(50, lambda: cs_d.yview_moveto(1.0))
 
@@ -2759,7 +2759,7 @@ def open_macros() -> None:
     win.resizable(True, True)
     win.overrideredirect(True)
 
-    def on_close_macros():
+    def on_close_macros() -> None:
         _macros_window[0] = None
         try:
             if hasattr(win, '_rounded_job') and win._rounded_job:
@@ -2783,8 +2783,8 @@ def open_macros() -> None:
     _bc_bg  = btn_cls.create_oval(1, 1, 21, 21, fill=accent, outline="")
     _bc_txt = btn_cls.create_text(11, 11, text="✕", fill=fg2, font=("Segoe UI", 8, "bold"))
 
-    def _bc_enter(e): btn_cls.itemconfig(_bc_bg, fill=COLOR_RED_DARK); btn_cls.itemconfig(_bc_txt, fill="white")
-    def _bc_leave(e): btn_cls.itemconfig(_bc_bg, fill=accent);         btn_cls.itemconfig(_bc_txt, fill=fg2)
+    def _bc_enter(e) -> None: btn_cls.itemconfig(_bc_bg, fill=COLOR_RED_DARK); btn_cls.itemconfig(_bc_txt, fill="white")
+    def _bc_leave(e) -> None: btn_cls.itemconfig(_bc_bg, fill=accent);         btn_cls.itemconfig(_bc_txt, fill=fg2)
     btn_cls.bind("<Button-1>", lambda e: on_close_macros())
     btn_cls.bind("<Enter>", _bc_enter)
     btn_cls.bind("<Leave>", _bc_leave)
@@ -2832,7 +2832,7 @@ def open_macros() -> None:
     # ═══════════════════════════════════════════════════════════════════════
     # Bouton Sauvegarder (commun aux trois onglets)
     # ═══════════════════════════════════════════════════════════════════════
-    def save_all():
+    def save_all() -> None:
         # Limites de longueur — prévient regex DoS et config géante
         _MAX_NAME = 200
         _MAX_TEXT = 10000     # texte de remplacement max (macros/dictionnaire)
@@ -2883,7 +2883,7 @@ _pre_buffer = deque(maxlen=_PRE_BUFFER_BLOCKS)
 
 _stream_error = threading.Event()   # set() si le stream audio a signalé une erreur
 
-def audio_callback(indata, frames, time_info, status):
+def audio_callback(indata, frames, time_info, status) -> None:
     """Callback audio avec gestion d'erreur."""
     try:
         if status:
@@ -2905,9 +2905,9 @@ def audio_callback(indata, frames, time_info, status):
         log_error(e, "Erreur callback audio")
 
 # ── Micro à 100% — meilleure transcription ──────────────────────────────
-def _set_mic_volume_100():
+def _set_mic_volume_100() -> None:
     """Met le micro Windows par défaut à 100% via pycaw (Windows Core Audio API)."""
-    def _do_pycaw():
+    def _do_pycaw() -> None:
         """Sous-fonction pour scoper les variables COM locales."""
         from ctypes import cast, POINTER
         from comtypes import CLSCTX_ALL
@@ -2923,7 +2923,7 @@ def _set_mic_volume_100():
             return f"[MIC] Volume micro {before*100:.0f}% → 100%"
         return "[MIC] Volume micro déjà à 100%"
 
-    def _do():
+    def _do() -> None:
         import comtypes
         comtypes.CoInitialize()
         msg = "[MIC] Erreur inconnue"
@@ -2973,7 +2973,7 @@ _STREAMING_INTERVAL_MS = 1500     # Transcrire toutes les 1.5 secondes
 _STREAMING_LABEL_OFFSET_Y = 35    # Pixels sous le curseur
 
 
-def _show_streaming_label(text):
+def _show_streaming_label(text: str) -> None:
     """Affiche ou met à jour le label flottant d'aperçu streaming."""
     if not text or not _streamer.enabled:
         _hide_streaming_label()
@@ -3024,7 +3024,7 @@ def _show_streaming_label(text):
         log_error(e, "streaming label")
 
 
-def _hide_streaming_label():
+def _hide_streaming_label() -> None:
     """Cache et détruit le label flottant."""
     try:
         if _streaming_label_win[0] is not None:
@@ -3035,7 +3035,7 @@ def _hide_streaming_label():
     _streaming_label_text[0] = None
 
 
-def _update_streaming_label_position():
+def _update_streaming_label_position() -> None:
     """Met à jour la position du label pour suivre le curseur."""
     if _streaming_label_win[0] is not None:
         try:
@@ -3065,7 +3065,7 @@ def _update_streaming_label_position():
 
 # (transcription + copier-coller → core/transcription.py)
 
-def transcribe_audio(model, audio_data, use_vad=True):
+def transcribe_audio(model, audio_data, use_vad: bool = True) -> str:
     """Wrapper : transcrit via core/transcription.py avec les globals."""
     return _transcribe_audio_core(
         model, audio_data, config,
@@ -3093,7 +3093,7 @@ def _load_model() -> None:
     return model
 
 
-def _recover_stream_error():
+def _recover_stream_error() -> None:
     """Détecte et récupère les erreurs de stream audio (micro déconnecté)."""
     if not _stream_error.is_set():
         return
@@ -3126,7 +3126,7 @@ def _recover_stream_error():
     set_statut_safe(tr("mic_error"), COLOR_RED, COLOR_RED)
 
 
-def _record_meeting_loop(model):
+def _record_meeting_loop(model) -> None:
     """Boucle d'enregistrement en mode réunion — segmente et transcrit automatiquement."""
     MAX_TICKS   = int(MEETING_MAX_DURATION / MEETING_POLL)
     GRACE_TICKS = int(MEETING_GRACE_PERIOD / MEETING_POLL)
@@ -3195,7 +3195,7 @@ def _record_meeting_loop(model):
                 process_and_paste(texte, delay=0.3)
 
 
-def _record_ptt(model, hotkey):
+def _record_ptt(model, hotkey) -> None:
     """Enregistre et transcrit un segment push-to-talk.
 
     Si le streaming est activé, transcrit périodiquement avec le modèle tiny
@@ -3380,7 +3380,7 @@ root.after(200, _setup_drag_drop)      # drag-and-drop fichiers audio
 main_thread[0] = threading.Thread(target=chargement, daemon=True)
 main_thread[0].start()
 
-def watchdog():
+def watchdog() -> None:
     """Surveille le thread principal et le relance si nécessaire."""
     _restarts = 0
     _MAX_RESTARTS = 5
@@ -3419,7 +3419,7 @@ def watchdog():
 threading.Thread(target=watchdog, daemon=True).start()
 
 # ── Nettoyage VRAM (fix crash CUDA) — lancé une seule fois ───────────────
-def vram_cleanup():
+def vram_cleanup() -> None:
     """Nettoie la VRAM GPU toutes les 5 minutes pour éviter cudaErrorLaunchFailure.
     Fonctionne avec ou sans torch (gc.collect libère les objets ctranslate2).
     IMPORTANT : gc.collect() est acquis sous _recording_lock pour éviter qu'il
@@ -3461,7 +3461,7 @@ def vram_cleanup():
 threading.Thread(target=vram_cleanup, daemon=True).start()
 
 # ── Filet de sécurité — log les sorties inattendues ──────────────────────
-def _atexit_guard():
+def _atexit_guard() -> None:
     """Loggue si le processus se termine sans passer par on_close()."""
     if not _app_closing[0]:
         log_error(msg="SORTIE INATTENDUE — le processus a été tué sans on_close()")
