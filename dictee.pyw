@@ -329,6 +329,8 @@ from ui.winapi import (
     WS_EX_TOOLWINDOW as _WS_EX_TOOLWINDOW,
     WS_EX_NOACTIVATE as _WS_EX_NOACTIVATE,
     invalidate_hwnd_cache as _invalidate_hwnd_cache,
+    _target_hwnd,
+    _root_hwnd,
 )
 from ui.helpers import (
     _draw_pill, _create_pill_button,
@@ -337,6 +339,54 @@ from ui.helpers import (
     _make_scroll_area,
 )
 from ui.dialogs import open_help
+
+# ── Thèmes (avant ui.init — nécessaire immédiatement) ─────────────────
+THEMES = {
+    "dark": {
+        "bg": "#1c1c28",          # fond principal — proche du screenshot
+        "bg_vu": "#1c1c28",       # VU-mètre : pas de boîte, même fond
+        "fg": COLOR_WHITE,
+        "fg2": "#777788",
+        "fg_title": "#e0e0f0",    # titre Whisper Hélio
+        "btn_fg": "#777788",
+        "btn_icon_bg": "#2a2a3e", # fond boutons ronds header
+        "link": "#777788",
+        "vu_color": "#22d3ee",    # cyan du VU-mètre
+        "footer_btn_bg": "#22d3ee",
+        "footer_btn_fg": "#0a0a14",
+        "input_bg": "#2d2d44",    # fond Entry/OptionMenu
+        "input_fg": "white",
+        "input_hover": "#3d3d54", # OptionMenu hover
+        "vu_pill_bg": "#111120",  # fond pill VU-mètre
+    },
+    "light": {
+        "bg": "#f0f4f8",
+        "bg_vu": "#f0f4f8",
+        "fg": "#1a1a2e",
+        "fg2": "#555577",
+        "fg_title": "#1a1a2e",
+        "btn_fg": "#555577",
+        "btn_icon_bg": "#dde3ea",
+        "link": "#555577",
+        "vu_color": "#0891b2",
+        "footer_btn_bg": "#0891b2",
+        "footer_btn_fg": "#ffffff",
+        "input_bg": "#dde3ea",    # fond Entry/OptionMenu
+        "input_fg": "#1a1a2e",
+        "input_hover": "#cdd3da", # OptionMenu hover
+        "vu_pill_bg": "#d8dfe6",  # fond pill VU-mètre
+    }
+}
+
+# Cache du thème courant
+_current_theme = [None]
+
+def theme() -> dict[str, str]:
+    """Retourne le thème courant (avec cache)."""
+    theme_name = config["theme"]
+    if _current_theme[0] is None or _current_theme[0][0] != theme_name:
+        _current_theme[0] = (theme_name, THEMES.get(theme_name, THEMES["dark"]))
+    return _current_theme[0][1]
 
 # -- Phase 1 ui.init() -- references disponibles immediatement ---------
 ui.init(
@@ -444,54 +494,6 @@ def init_device() -> tuple[str, str, str]:
 # Placeholders mis à jour par le thread chargement
 detected_device, detected_compute, hw_info = "auto", "auto", ""
 
-# ── Thèmes ────────────────────────────────────────────────────────────────
-THEMES = {
-    "dark": {
-        "bg": "#1c1c28",          # fond principal — proche du screenshot
-        "bg_vu": "#1c1c28",       # VU-mètre : pas de boîte, même fond
-        "fg": COLOR_WHITE,
-        "fg2": "#777788",
-        "fg_title": "#e0e0f0",    # titre Whisper Hélio
-        "btn_fg": "#777788",
-        "btn_icon_bg": "#2a2a3e", # fond boutons ronds header
-        "link": "#777788",
-        "vu_color": "#22d3ee",    # cyan du VU-mètre
-        "footer_btn_bg": "#22d3ee",
-        "footer_btn_fg": "#0a0a14",
-        "input_bg": "#2d2d44",    # fond Entry/OptionMenu
-        "input_fg": "white",
-        "input_hover": "#3d3d54", # OptionMenu hover
-        "vu_pill_bg": "#111120",  # fond pill VU-mètre
-    },
-    "light": {
-        "bg": "#f0f4f8",
-        "bg_vu": "#f0f4f8",
-        "fg": "#1a1a2e",
-        "fg2": "#555577",
-        "fg_title": "#1a1a2e",
-        "btn_fg": "#555577",
-        "btn_icon_bg": "#dde3ea",
-        "link": "#555577",
-        "vu_color": "#0891b2",
-        "footer_btn_bg": "#0891b2",
-        "footer_btn_fg": "#ffffff",
-        "input_bg": "#dde3ea",    # fond Entry/OptionMenu
-        "input_fg": "#1a1a2e",
-        "input_hover": "#cdd3da", # OptionMenu hover
-        "vu_pill_bg": "#d8dfe6",  # fond pill VU-mètre
-    }
-}
-
-# Cache du thème courant
-_current_theme = [None]
-
-def theme() -> dict[str, str]:
-    """Retourne le thème courant (avec cache)."""
-    theme_name = config["theme"]
-    if _current_theme[0] is None or _current_theme[0][0] != theme_name:
-        _current_theme[0] = (theme_name, THEMES.get(theme_name, THEMES["dark"]))
-    return _current_theme[0][1]
-
 # ── Position de démarrage ─────────────────────────────────────────────────
 def get_start_pos(w: int, h: int, sw: int, sh: int, position: str) -> tuple[int, int]:
     """Calcule la position de démarrage de la fenêtre."""
@@ -539,6 +541,9 @@ root.configure(bg=theme()["bg"])
 # ──────────────────────────────────────────────────────────────────────────
 _u32 = ui._u32  # alias local (utilise dans minimize/restore/on_close)
 _ICO_PATH = str(BASE_DIR / "whisper_helio.ico")   # pathlib -> str pour WinAPI
+_minimized  = [False]
+_minimizing = [False]   # True pendant la séquence minimize → bloque <Map>
+_saved_geom = [None]
 
 def _apply_icon_to_hwnd(hwnd: int) -> None:
     """Applique whisper_helio.ico via triple methode (-> ui.winapi)."""
@@ -2392,6 +2397,14 @@ def process_and_paste(texte: str, delay: float = PASTE_DELAY) -> str:
         copy_and_paste(texte, delay=delay)
     return texte
 
+def copy_and_paste(text: str, delay: float = PASTE_DELAY) -> None:
+    """Wrapper : copie-colle via core/transcription.py avec les globals."""
+    _copy_and_paste_core(
+        text, delay=delay,
+        restore_focus_fn=_restore_target_focus,
+        target_hwnd=_target_hwnd[0],
+    )
+
 # -- Phase 4 ui.init() -- copy_and_paste --------------------------------
 ui.init(copy_and_paste=copy_and_paste)
 
@@ -3072,13 +3085,7 @@ def transcribe_audio(model, audio_data, use_vad: bool = True) -> str:
         device=detected_device, compute=detected_compute, use_vad=use_vad,
     )
 
-def copy_and_paste(text: str, delay: float = PASTE_DELAY) -> None:
-    """Wrapper : copie-colle via core/transcription.py avec les globals."""
-    _copy_and_paste_core(
-        text, delay=delay,
-        restore_focus_fn=_restore_target_focus,
-        target_hwnd=_target_hwnd[0],
-    )
+# copy_and_paste() déplacé avant Phase 4 ui.init() (ligne ~2395)
 
 # ── Chargement & boucle principale ────────────────────────────────────────
 _global_model = [None]   # modèle Whisper persisté — évite rechargement par watchdog
