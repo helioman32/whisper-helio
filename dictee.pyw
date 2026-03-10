@@ -14,6 +14,7 @@ Historique v1.4b :
 - Minimisation WinAPI, mode compact, dictionnaire lignes alternées
 - Harmonisation UI/UX des fenêtres Macros / Actions / Dictionnaire
 """
+from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
@@ -66,7 +67,7 @@ root = TkinterDnD.Tk() if _HAS_DND else tk.Tk()
 root.withdraw()   # Caché IMMÉDIATEMENT — rien n'apparaît à l'écran
 
 # ── Import critique — si un module manque, message clair au lieu de crash
-def _fatal_import(error):
+def _fatal_import(error: ImportError) -> None:
     """Affiche une erreur fatale d'import et quitte proprement."""
     try:
         import tkinter.messagebox as _mb
@@ -399,9 +400,10 @@ def _tooltip_cancel():
 
 
 # ── Détection matériel ────────────────────────────────────────────────────
-def init_device():
+def init_device() -> tuple[str, str, str]:
     """Initialise le device et détecte le matériel disponible.
     La vraie vérification CUDA se fait au warmup (DLL cublas, etc.).
+    Returns (device, compute_type, hw_info_str).
     """
     dev = config["device"]
     if dev in ("cuda", "auto"):
@@ -483,7 +485,7 @@ THEMES = {
 # Cache du thème courant
 _current_theme = [None]
 
-def theme():
+def theme() -> dict[str, str]:
     """Retourne le thème courant (avec cache)."""
     theme_name = config["theme"]
     if _current_theme[0] is None or _current_theme[0][0] != theme_name:
@@ -491,7 +493,7 @@ def theme():
     return _current_theme[0][1]
 
 # ── Position de démarrage ─────────────────────────────────────────────────
-def get_start_pos(w, h, sw, sh, position):
+def get_start_pos(w: int, h: int, sw: int, sh: int, position: str) -> tuple[int, int]:
     """Calcule la position de démarrage de la fenêtre."""
     margin = 20
     positions = {
@@ -538,12 +540,12 @@ root.configure(bg=theme()["bg"])
 _u32 = ui._u32  # alias local (utilise dans minimize/restore/on_close)
 _ICO_PATH = str(BASE_DIR / "whisper_helio.ico")   # pathlib -> str pour WinAPI
 
-def _apply_icon_to_hwnd(hwnd):
+def _apply_icon_to_hwnd(hwnd: int) -> None:
     """Applique whisper_helio.ico via triple methode (-> ui.winapi)."""
     ui.winapi.apply_icon_to_hwnd(hwnd, _ICO_PATH)
 
 
-def minimize_to_taskbar():
+def minimize_to_taskbar() -> None:
     """Minimise root dans la taskbar.
     
     Séquence critique (ordre impératif) :
@@ -715,7 +717,7 @@ _last_file_path     = [None]   # chemin du fichier audio source ou None
 # threading.Lock — acquire(blocking=False) est atomique (pas de TOCTOU)
 _recording_lock = threading.Lock()
 
-def on_close():
+def on_close() -> None:
     """Ferme proprement l'application."""
     if _app_closing[0]:
         return   # re-entry guard (Ctrl+C + bouton fermer simultanés)
@@ -793,14 +795,14 @@ except Exception:
 root.protocol("WM_DELETE_WINDOW", on_close)
 
 # ── Coins arrondis + NoActivate ───────────────────────────────────────────
-def apply_rounded(event=None):
+def apply_rounded(event: tk.Event | None = None) -> None:
     """Applique coins arrondis + WS_EX_TOOLWINDOW + WS_EX_NOACTIVATE (-> ui.winapi)."""
     ui.winapi.apply_rounded(event)
 
 _rounded_job = [None]
 _last_rounded = [0]
 
-def schedule_rounded(event=None):
+def schedule_rounded(event: tk.Event | None = None) -> None:
     """Planifie l'application des coins arrondis avec debounce."""
     if _app_closing[0]:
         return
@@ -821,7 +823,7 @@ _resize_edge = [None]
 
 _current_cursor = [""]
 
-def set_cursor(cursor):
+def set_cursor(cursor: str) -> None:
     """Change le curseur seulement si différent."""
     if cursor != _current_cursor[0]:
         root.config(cursor=cursor)
@@ -1172,7 +1174,7 @@ _tooltip_bind(btn_fermer,   "tooltip_close")
 # ── Hotkey label ──────────────────────────────────────────────────────────
 HOTKEY_LABELS = {"mouse_x1": "thumb_back", "mouse_x2": "thumb_fwd"}
 
-def _hotkey_label():
+def _hotkey_label() -> str:
     """Retourne le label du hotkey configuré."""
     h = config["hotkey"]
     if h in HOTKEY_LABELS:
@@ -1186,7 +1188,7 @@ mode_libre = [False]
 hotkey_changed = [False]
 _last_toggle_time = [0]
 
-def toggle_libre():
+def toggle_libre() -> None:
     """Active/désactive le mode réunion avec debounce."""
     now = time.perf_counter()
     if now - _last_toggle_time[0] < DEBOUNCE_DELAY:
@@ -1502,7 +1504,7 @@ root.deiconify()
 root.attributes('-alpha', 0.93)
 
 # ── Thème ─────────────────────────────────────────────────────────────────
-def apply_theme():
+def apply_theme() -> None:
     """Applique le thème à tous les widgets."""
     t = theme()
     bg = t["bg"]
@@ -1571,16 +1573,16 @@ def apply_theme():
     root.update_idletasks()
 
 # ── Fonctions UI thread-safe ──────────────────────────────────────────────
-def set_statut(texte, couleur, voyant_couleur):
+def set_statut(texte: str, couleur: str, voyant_couleur: str) -> None:
     """Met à jour le statut (appeler depuis le thread principal)."""
     statut_label.config(text=texte, fg=couleur)
     voyant.itemconfig(cercle, fill=voyant_couleur)
 
-def set_texte(texte):
+def set_texte(texte: str) -> None:
     """Met à jour le texte de transcription."""
     texte_label.config(text=texte)
 
-def _safe_after(delay_ms, callback):
+def _safe_after(delay_ms: int, callback: callable) -> None:
     """Planifie callback via root.after() en toute sécurité.
     Ignore silencieusement les TclError si la fenêtre est déjà détruite
     (évite les crashs pendant la fermeture de l'app).
@@ -1592,11 +1594,11 @@ def _safe_after(delay_ms, callback):
     except Exception:
         pass   # fenêtre détruite — normal pendant on_close()
 
-def set_statut_safe(texte, couleur, voyant_couleur):
+def set_statut_safe(texte: str, couleur: str, voyant_couleur: str) -> None:
     """Met à jour le statut de manière thread-safe."""
     _safe_after(0, lambda: None if _app_closing[0] else set_statut(texte, couleur, voyant_couleur))
 
-def set_texte_safe(texte):
+def set_texte_safe(texte: str) -> None:
     """Met à jour le texte de manière thread-safe."""
     _safe_after(0, lambda: None if _app_closing[0] else set_texte(texte))
 
@@ -1611,7 +1613,7 @@ ui.init(
 
 
 # -- Fenetre Parametres (-> ui.dialogs.open_settings) ----------------------
-def open_settings():
+def open_settings() -> None:
     """Ouvre la fenetre des parametres (-> ui.dialogs.open_settings)."""
     from ui.dialogs import open_settings as _open_settings_ui
 
@@ -1727,7 +1729,7 @@ def _handle_dropped_file(filepath):
         _file_transcribing.release()
 
 
-def open_file_transcribe():
+def open_file_transcribe() -> None:
     """Ouvre un dialogue de sélection de fichier audio et lance la transcription."""
     # Vérifications préalables — acquire atomique (pas de TOCTOU)
     if not _file_transcribing.acquire(blocking=False):
@@ -1798,7 +1800,7 @@ _PAUSE_SENTENCE  = 0.8     # pause courte après fin de phrase → nouveau parag
 _SENTENCE_ENDS   = frozenset(".!?…»\")")
 
 
-def _format_transcription(segments_data):
+def _format_transcription(segments_data: list[tuple[str, float, float]]) -> str:
     """Met en forme le texte transcrit avec paragraphes automatiques.
 
     Utilise les timestamps des segments Whisper pour détecter les pauses
@@ -1858,7 +1860,7 @@ def _format_transcription(segments_data):
     return "\n\n".join(formatted).strip()
 
 
-def _transcribe_file_worker(filepath, filename):
+def _transcribe_file_worker(filepath: str, filename: str) -> None:
     """Thread worker : transcrit un fichier audio et affiche les résultats.
 
     Stratégie d'accélération (v1.5) :
@@ -2019,7 +2021,7 @@ def _transcribe_file_worker(filepath, filename):
         _file_transcribing.release()
 
 
-def _show_file_result(filename, text):
+def _show_file_result(filename: str, text: str) -> None:
     """Affiche le résultat de transcription dans une fenêtre Toplevel."""
     if _app_closing[0]:
         return
@@ -2377,7 +2379,7 @@ def _show_export_dialog(parent_win):
 
 
 # ── Fenêtre Macros ────────────────────────────────────────────────────────
-def process_and_paste(texte, delay=PASTE_DELAY):
+def process_and_paste(texte: str, delay: float = PASTE_DELAY) -> str:
     """Applique macros + actions + dictionnaire puis colle. Retourne le texte final."""
     texte = apply_macros(texte, config)
     texte = apply_actions(texte, config, set_status=set_statut_safe)
@@ -2731,7 +2733,7 @@ def _build_dict_tab(notebook, win, t):
     return dict_rows
 
 
-def open_macros():
+def open_macros() -> None:
     """Ouvre le gestionnaire de macros et actions vocales (3 onglets)."""
     if _macros_window[0] is not None:
         try:
@@ -3070,7 +3072,7 @@ def transcribe_audio(model, audio_data, use_vad=True):
         device=detected_device, compute=detected_compute, use_vad=use_vad,
     )
 
-def copy_and_paste(text, delay=PASTE_DELAY):
+def copy_and_paste(text: str, delay: float = PASTE_DELAY) -> None:
     """Wrapper : copie-colle via core/transcription.py avec les globals."""
     _copy_and_paste_core(
         text, delay=delay,
@@ -3081,7 +3083,7 @@ def copy_and_paste(text, delay=PASTE_DELAY):
 # ── Chargement & boucle principale ────────────────────────────────────────
 _global_model = [None]   # modèle Whisper persisté — évite rechargement par watchdog
 
-def _load_model():
+def _load_model() -> None:
     """Wrapper : charge le modèle via core/model.py et met à jour les globals."""
     global detected_device, detected_compute
     model, detected_device, detected_compute = _load_model_core(
@@ -3248,7 +3250,7 @@ def _record_ptt(model, hotkey):
         time.sleep(DEBOUNCE_DELAY)
 
 
-def chargement():
+def chargement() -> None:
     """Thread principal de chargement et transcription."""
     global detected_device, detected_compute, hw_info
 
